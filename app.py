@@ -1,7 +1,7 @@
 import os
 import shutil
 from datetime import datetime
-from flask import Flask, request, jsonify, send_from_directory, session, redirect
+from flask import Flask, request, jsonify, send_from_directory, session
 
 from database import init_db, create_user, verify_user, get_or_create_plant, \
     insert_photo, log_action, get_all_plants, get_photos_by_plant, get_all_photos
@@ -13,6 +13,8 @@ app.secret_key = os.environ.get("SECRET_KEY", "plant-archive-secret-change-in-pr
 
 UPLOAD_BASE = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_BASE, exist_ok=True)
+
+VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.flv', '.webm', '.3gp'}
 
 
 # ── Auth helpers ───────────────────────────────────────────────────────────────
@@ -113,11 +115,16 @@ def upload_photo():
     if not file.filename:
         return jsonify({"error": "Empty filename"}), 400
 
+    ext = os.path.splitext(file.filename)[1].lower()
+
+    # Video check — return special flag so frontend shows one warning
+    if ext in VIDEO_EXTENSIONS:
+        return jsonify({"error": "video", "filename": file.filename}), 415
+
     if not is_supported(file.filename):
         return jsonify({"error": f"Unsupported file type: {file.filename}"}), 400
 
-    original_filename = file.filename
-    ext = os.path.splitext(original_filename)[1]
+    original_filename = os.path.basename(file.filename.replace('/', os.sep).replace('\\', os.sep))
 
     temp_path = os.path.join(UPLOAD_BASE, f"_temp_{user['id']}_{original_filename}")
     file.save(temp_path)
@@ -138,7 +145,6 @@ def upload_photo():
             "message": "No EXIF date found. Please provide the date the photo was taken."
         }), 422
 
-    # Store photos per user
     user_dir = os.path.join(UPLOAD_BASE, f"user_{user['id']}", plant_name.replace(" ", "_"))
     os.makedirs(user_dir, exist_ok=True)
 
@@ -174,13 +180,32 @@ def upload_photo():
     })
 
 
-# ── API: Plants & Photos ───────────────────────────────────────────────────────
+# ── API: Plants ────────────────────────────────────────────────────────────────
 
 @app.route("/api/plants", methods=["GET"])
 @login_required
 def list_plants():
     return jsonify(get_all_plants(current_user()["id"]))
 
+
+@app.route("/api/plants", methods=["POST"])
+@login_required
+def create_plant():
+    data = request.get_json()
+    name = (data.get("name") or "").strip().lower()
+    if not name:
+        return jsonify({"error": "Plant name is required"}), 400
+
+    user = current_user()
+    plant_id = get_or_create_plant(name, user["id"])
+
+    plant_dir = os.path.join(UPLOAD_BASE, f"user_{user['id']}", name.replace(" ", "_"))
+    os.makedirs(plant_dir, exist_ok=True)
+
+    return jsonify({"success": True, "id": plant_id, "name": name})
+
+
+# ── API: Photos ────────────────────────────────────────────────────────────────
 
 @app.route("/api/plants/<int:plant_id>/photos", methods=["GET"])
 @login_required

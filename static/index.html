@@ -23,9 +23,6 @@
       --gray-200: #B4B2A9;
       --gray-600: #5F5E5A;
       --gray-800: #444441;
-      --teal-50: #E1F5EE;
-      --teal-600: #0F6E56;
-      --teal-800: #085041;
     }
 
     body {
@@ -37,72 +34,43 @@
 
     header {
       background: var(--green-900);
-      padding: 1.5rem 2rem;
+      padding: 1.25rem 2rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
+      justify-content: space-between;
     }
 
     header h1 {
       font-family: 'Playfair Display', serif;
-      font-size: 1.6rem;
+      font-size: 1.5rem;
       font-weight: 400;
       color: var(--green-50);
-      letter-spacing: 0.02em;
-    }
-
-    header .leaf {
-      font-size: 1.4rem;
     }
 
     .layout {
       display: grid;
       grid-template-columns: 260px 1fr;
-      min-height: calc(100vh - 68px);
+      min-height: calc(100vh - 64px);
     }
 
-    /* Sidebar */
+    /* ── Sidebar ── */
     .sidebar {
       background: white;
       border-right: 1px solid var(--gray-100);
-      padding: 1.5rem 1rem;
+      padding: 1.25rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
     }
 
-    .sidebar h2 {
-      font-size: 0.7rem;
+    .sidebar-section-label {
+      font-size: 0.68rem;
       font-weight: 500;
       letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--gray-200);
-      padding: 0 0.5rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .plant-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.6rem 0.75rem;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.15s;
-      font-size: 0.9rem;
-    }
-
-    .plant-item:hover { background: var(--green-50); }
-    .plant-item.active { background: var(--green-50); color: var(--green-800); font-weight: 500; }
-
-    .plant-item .count {
-      font-size: 0.75rem;
-      color: var(--gray-200);
-      background: var(--gray-50);
-      padding: 2px 8px;
-      border-radius: 20px;
-    }
-
-    .plant-item.active .count {
-      background: var(--green-100);
-      color: var(--green-800);
+      padding: 0.5rem 0.75rem 0.25rem;
+      margin-top: 0.5rem;
     }
 
     .all-btn {
@@ -111,7 +79,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.6rem 0.75rem;
+      padding: 0.55rem 0.75rem;
       border-radius: 8px;
       cursor: pointer;
       font-size: 0.9rem;
@@ -120,143 +88,204 @@
       border: none;
       color: var(--gray-800);
       font-family: inherit;
-      margin-bottom: 0.5rem;
       transition: background 0.15s;
     }
     .all-btn:hover { background: var(--gray-50); }
     .all-btn.active { background: var(--green-50); color: var(--green-800); }
 
-    /* Main content */
-    .main {
-      padding: 2rem;
-    }
-
-    /* Upload zone */
-    .upload-section {
-      background: white;
-      border: 2px dashed var(--green-100);
-      border-radius: 16px;
-      padding: 2.5rem;
-      text-align: center;
-      margin-bottom: 2rem;
-      transition: border-color 0.2s, background 0.2s;
-      cursor: pointer;
-    }
-
-    .upload-section.dragover {
-      border-color: var(--green-600);
-      background: var(--green-50);
-    }
-
-    .upload-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
-
-    .upload-section h3 {
-      font-family: 'Playfair Display', serif;
-      font-size: 1.2rem;
-      font-weight: 400;
-      color: var(--green-800);
-      margin-bottom: 0.4rem;
-    }
-
-    .upload-section p {
-      font-size: 0.85rem;
-      color: var(--gray-200);
-      margin-bottom: 1.25rem;
-    }
-
-    .upload-controls {
+    .plant-item {
       display: flex;
-      gap: 0.75rem;
-      justify-content: center;
-      flex-wrap: wrap;
       align-items: center;
-    }
-
-    .upload-controls input[type="text"],
-    .upload-controls input[type="date"] {
-      padding: 0.5rem 0.85rem;
-      border: 1px solid var(--gray-100);
+      justify-content: space-between;
+      padding: 0.55rem 0.75rem;
       border-radius: 8px;
-      font-family: inherit;
-      font-size: 0.875rem;
-      color: var(--gray-800);
-      background: var(--gray-50);
-      outline: none;
-      transition: border-color 0.15s;
-    }
-
-    .upload-controls input:focus { border-color: var(--green-200); background: white; }
-
-    .upload-controls label.btn {
-      padding: 0.5rem 1.25rem;
-      background: var(--green-800);
-      color: var(--green-50);
-      border-radius: 8px;
-      font-size: 0.875rem;
-      font-weight: 500;
       cursor: pointer;
       transition: background 0.15s;
+      font-size: 0.875rem;
+      gap: 0.5rem;
+    }
+    .plant-item:hover { background: var(--green-50); }
+    .plant-item.active { background: var(--green-50); color: var(--green-800); font-weight: 500; }
+
+    .plant-item .plant-label { flex: 1; text-transform: capitalize; }
+
+    .plant-item .count {
+      font-size: 0.72rem;
+      color: var(--gray-200);
+      background: var(--gray-50);
+      padding: 2px 7px;
+      border-radius: 20px;
+      flex-shrink: 0;
+    }
+    .plant-item.active .count { background: var(--green-100); color: var(--green-800); }
+
+    /* drag-over highlight on sidebar plant items */
+    .plant-item.drag-target {
+      background: var(--green-50);
+      outline: 2px dashed var(--green-600);
     }
 
-    .upload-controls label.btn:hover { background: var(--green-900); }
-    #file-input { display: none; }
-
-    /* Date missing warning */
-    .date-warning {
-      display: none;
-      background: var(--amber-50);
-      border: 1px solid #EF9F27;
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      font-size: 0.85rem;
-      color: var(--amber-400);
-      margin-top: 0.75rem;
+    /* new folder row */
+    .new-folder-row {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.5rem;
     }
-
-    /* Toast */
-    #toast {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
+    .new-folder-row input {
+      flex: 1;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid var(--gray-100);
+      border-radius: 7px;
+      font-family: inherit;
+      font-size: 0.8rem;
+      outline: none;
+      background: var(--gray-50);
+    }
+    .new-folder-row input:focus { border-color: var(--green-200); background: white; }
+    .new-folder-row button {
+      padding: 0.4rem 0.7rem;
       background: var(--green-800);
       color: var(--green-50);
-      padding: 0.75rem 1.25rem;
-      border-radius: 10px;
-      font-size: 0.875rem;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: opacity 0.25s, transform 0.25s;
-      pointer-events: none;
-      z-index: 100;
-      max-width: 320px;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: inherit;
     }
+    .new-folder-row button:hover { background: var(--green-900); }
 
-    #toast.show { opacity: 1; transform: translateY(0); }
-    #toast.error { background: #A32D2D; }
+    /* ── Main ── */
+    .main { padding: 2rem; }
 
-    /* Photo grid */
-    .grid-header {
+    /* View toggle */
+    .view-bar {
       display: flex;
-      align-items: baseline;
-      gap: 1rem;
-      margin-bottom: 1.25rem;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
     }
 
-    .grid-header h2 {
+    .view-bar h2 {
       font-family: 'Playfair Display', serif;
       font-size: 1.4rem;
       font-weight: 400;
       text-transform: capitalize;
     }
 
-    .grid-header .meta {
-      font-size: 0.8rem;
+    .view-bar .right { display: flex; align-items: center; gap: 1rem; }
+    .view-bar .meta { font-size: 0.8rem; color: var(--gray-200); }
+
+    .view-toggle {
+      display: flex;
+      background: var(--gray-50);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+    .view-toggle button {
+      border: none;
+      background: none;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.15s;
       color: var(--gray-200);
     }
+    .view-toggle button.active { background: white; color: var(--gray-800); }
 
+    /* ── Upload zone ── */
+    .upload-section {
+      background: white;
+      border: 2px dashed var(--green-100);
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      margin-bottom: 2rem;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-section.dragover { border-color: var(--green-600); background: var(--green-50); }
+    .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+    .upload-section h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      font-weight: 400;
+      color: var(--green-800);
+      margin-bottom: 0.3rem;
+    }
+    .upload-section p { font-size: 0.82rem; color: var(--gray-200); margin-bottom: 1rem; }
+
+    .upload-controls {
+      display: flex;
+      gap: 0.6rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .upload-controls input[type="text"],
+    .upload-controls input[type="date"] {
+      padding: 0.45rem 0.8rem;
+      border: 1px solid var(--gray-100);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      color: var(--gray-800);
+      background: var(--gray-50);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .upload-controls input:focus { border-color: var(--green-200); background: white; }
+    .upload-controls label.btn {
+      padding: 0.45rem 1.1rem;
+      background: var(--green-800);
+      color: var(--green-50);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .upload-controls label.btn:hover { background: var(--green-900); }
+    #file-input, #folder-input { display: none; }
+
+    .date-warning {
+      display: none;
+      background: var(--amber-50);
+      border: 1px solid #EF9F27;
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.82rem;
+      color: var(--amber-400);
+      margin-top: 0.75rem;
+    }
+
+    /* ── Folder grid view ── */
+    .folder-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 1rem;
+    }
+
+    .folder-card {
+      background: white;
+      border: 1px solid var(--gray-100);
+      border-radius: 14px;
+      padding: 1.25rem 1rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    }
+    .folder-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(23,52,4,0.08); }
+    .folder-card.drag-target { border-color: var(--green-600); background: var(--green-50); outline: 2px dashed var(--green-600); }
+
+    .folder-icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+    .folder-name { font-size: 0.85rem; font-weight: 500; text-transform: capitalize; color: var(--gray-800); }
+    .folder-count { font-size: 0.72rem; color: var(--gray-200); margin-top: 3px; }
+
+    /* ── Photo grid view ── */
     .photo-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
       gap: 1rem;
     }
 
@@ -266,89 +295,118 @@
       overflow: hidden;
       border: 1px solid var(--gray-100);
       transition: transform 0.15s, box-shadow 0.15s;
+      cursor: pointer;
     }
-
-    .photo-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(23, 52, 4, 0.1);
-    }
-
+    .photo-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(23,52,4,0.1); }
     .photo-card img {
       width: 100%;
       aspect-ratio: 1;
       object-fit: cover;
       display: block;
     }
-
-    .photo-card .photo-info {
-      padding: 0.6rem 0.75rem;
-    }
-
-    .photo-card .photo-date {
-      font-size: 0.8rem;
-      font-weight: 500;
-      color: var(--green-800);
-    }
-
-    .photo-card .photo-plant {
-      font-size: 0.75rem;
-      color: var(--gray-200);
-      text-transform: capitalize;
-      margin-top: 2px;
-    }
-
+    .photo-card .photo-info { padding: 0.55rem 0.7rem; }
+    .photo-card .photo-date { font-size: 0.8rem; font-weight: 500; color: var(--green-800); }
+    .photo-card .photo-plant { font-size: 0.72rem; color: var(--gray-200); text-transform: capitalize; margin-top: 2px; }
     .no-exif-badge {
       display: inline-block;
-      font-size: 0.65rem;
+      font-size: 0.62rem;
       background: var(--amber-50);
       color: var(--amber-400);
       border-radius: 4px;
-      padding: 1px 6px;
+      padding: 1px 5px;
       margin-top: 3px;
     }
 
+    /* ── Lightbox ── */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .lightbox.show { display: flex; }
+    .lightbox img {
+      max-width: 88vw;
+      max-height: 80vh;
+      object-fit: contain;
+      border-radius: 10px;
+    }
+    .lb-close {
+      position: absolute;
+      top: 1.5rem; right: 1.5rem;
+      background: rgba(255,255,255,0.12);
+      border: none; color: white;
+      width: 38px; height: 38px;
+      border-radius: 50%; font-size: 1.2rem;
+      cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .lb-meta { margin-top: 1rem; text-align: center; }
+    .lb-date { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: white; }
+    .lb-plant { font-size: 0.8rem; color: rgba(255,255,255,0.5); text-transform: capitalize; margin-top: 3px; }
+    .lb-nav { display: flex; gap: 1rem; margin-top: 1rem; }
+    .lb-nav button {
+      background: rgba(255,255,255,0.12); border: none; color: white;
+      width: 42px; height: 42px; border-radius: 50%; font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    /* ── Empty state ── */
     .empty-state {
       text-align: center;
       padding: 4rem 2rem;
       color: var(--gray-200);
     }
+    .empty-state .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .empty-state p { font-size: 0.9rem; }
 
-    .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
-    .empty-state p { font-size: 0.95rem; }
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 2rem; right: 2rem;
+      background: var(--green-800);
+      color: var(--green-50);
+      padding: 0.7rem 1.2rem;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      z-index: 300;
+      max-width: 320px;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.error { background: #A32D2D; }
+    #toast.warn { background: var(--amber-400); }
 
-    /* Upload progress */
+    /* ── Upload spinner ── */
     .uploading-overlay {
       display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(23,52,4,0.35);
-      z-index: 200;
-      align-items: center;
-      justify-content: center;
+      position: fixed; inset: 0;
+      background: rgba(23,52,4,0.3);
+      z-index: 250;
+      align-items: center; justify-content: center;
     }
-
     .uploading-overlay.show { display: flex; }
-
     .uploading-box {
-      background: white;
-      border-radius: 16px;
-      padding: 2rem 2.5rem;
-      text-align: center;
+      background: white; border-radius: 16px;
+      padding: 2rem 2.5rem; text-align: center;
       font-family: 'Playfair Display', serif;
-      font-size: 1.1rem;
-      color: var(--green-800);
+      font-size: 1.05rem; color: var(--green-800);
     }
-
     .spinner {
-      width: 32px;
-      height: 32px;
+      width: 30px; height: 30px;
       border: 3px solid var(--green-100);
       border-top-color: var(--green-600);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin: 0 auto 1rem;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
@@ -356,55 +414,88 @@
 
 <header>
   <div style="display:flex;align-items:center;gap:0.75rem;">
-    <span class="leaf">🌿</span>
+    <span style="font-size:1.3rem">🌿</span>
     <h1>Plant Archive</h1>
   </div>
   <div style="display:flex;align-items:center;gap:0.75rem;">
-    <span id="username-display" style="font-size:0.8rem;color:rgba(234,243,222,0.6);"></span>
+    <span id="username-display" style="font-size:0.8rem;color:rgba(234,243,222,0.55);"></span>
     <button onclick="doLogout()" style="background:rgba(255,255,255,0.12);border:none;color:#EAF3DE;padding:0.35rem 0.85rem;border-radius:8px;font-family:inherit;font-size:0.8rem;cursor:pointer;">Sign out</button>
   </div>
 </header>
 
 <div class="layout">
+  <!-- Sidebar -->
   <aside class="sidebar">
-    <h2>Collections</h2>
-    <button class="all-btn active" onclick="loadAll(this)">
-      All plants <span id="total-count" class="count">0</span>
+    <div class="sidebar-section-label">Collections</div>
+    <button class="all-btn active" onclick="showAllFolders(this)">
+      All plants <span id="total-count" class="count" style="font-size:0.72rem;background:#F1EFE8;padding:2px 7px;border-radius:20px;">0</span>
     </button>
     <div id="plant-list"></div>
+
+    <div class="sidebar-section-label" style="margin-top:auto;">New folder</div>
+    <div class="new-folder-row">
+      <input type="text" id="new-folder-input" placeholder="Plant name" />
+      <button onclick="createFolder()">+ Add</button>
+    </div>
   </aside>
 
+  <!-- Main -->
   <main class="main">
+
     <!-- Upload zone -->
     <div class="upload-section" id="drop-zone">
       <div class="upload-icon">📷</div>
-      <h3>Drop photos here</h3>
-      <p>Drag & drop or browse — JPEG, HEIC, PNG supported</p>
+      <h3>Drop photos or folders here</h3>
+      <p>Drag & drop files or entire folders — JPEG, HEIC, PNG · Videos are skipped</p>
       <div class="upload-controls">
-        <input type="text" id="plant-input" placeholder="Plant name (e.g. rose)" />
+        <input type="text" id="plant-input" placeholder="Plant name" />
         <input type="date" id="manual-date" title="Only needed if photo has no EXIF date" />
         <label class="btn" for="file-input">Browse files</label>
+        <label class="btn" for="folder-input" style="background:var(--green-600);">Browse folder</label>
         <input type="file" id="file-input" multiple accept=".jpg,.jpeg,.png,.heic,.heif,.tiff" />
+        <input type="file" id="folder-input" multiple webkitdirectory />
       </div>
       <div class="date-warning" id="date-warning">
-        ⚠ No EXIF date found in one or more photos. Please set the date above before uploading.
+        ⚠ No EXIF date found in one or more photos. Set the date above and retry.
       </div>
     </div>
 
-    <!-- Gallery -->
-    <div class="grid-header">
+    <!-- View bar -->
+    <div class="view-bar">
       <h2 id="gallery-title">All plants</h2>
-      <span class="meta" id="gallery-meta"></span>
+      <div class="right">
+        <span class="meta" id="gallery-meta"></span>
+        <div class="view-toggle">
+          <button id="btn-folder-view" class="active" title="Folder view" onclick="setView('folders')">📁</button>
+          <button id="btn-photo-view" title="Photo view" onclick="setView('photos')">⊞</button>
+        </div>
+      </div>
     </div>
-    <div class="photo-grid" id="photo-grid"></div>
-    <div class="empty-state" id="empty-state">
+
+    <!-- Content area -->
+    <div id="content-area"></div>
+    <div class="empty-state" id="empty-state" style="display:none;">
       <div class="icon">🌱</div>
-      <p>No photos yet — drop some in above</p>
+      <p id="empty-msg">No plants yet — create a folder or drop some photos in above</p>
     </div>
+
   </main>
 </div>
 
-<!-- Upload spinner -->
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <img id="lb-img" src="" alt="" />
+  <div class="lb-meta">
+    <div class="lb-date" id="lb-date"></div>
+    <div class="lb-plant" id="lb-plant"></div>
+  </div>
+  <div class="lb-nav">
+    <button onclick="lbNav(-1)">&#8592;</button>
+    <button onclick="lbNav(1)">&#8594;</button>
+  </div>
+</div>
+
 <div class="uploading-overlay" id="uploading-overlay">
   <div class="uploading-box">
     <div class="spinner"></div>
@@ -415,160 +506,14 @@
 <div id="toast"></div>
 
 <script>
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-  const plantInput = document.getElementById('plant-input');
-  const manualDate = document.getElementById('manual-date');
-  const photoGrid = document.getElementById('photo-grid');
-  const emptyState = document.getElementById('empty-state');
-  const plantList = document.getElementById('plant-list');
-  const galleryTitle = document.getElementById('gallery-title');
-  const galleryMeta = document.getElementById('gallery-meta');
-  const totalCount = document.getElementById('total-count');
-  const uploadingOverlay = document.getElementById('uploading-overlay');
+  // ── State ─────────────────────────────────────────────────────────────────
+  let allPlants = [];
+  let currentView = 'folders';   // 'folders' | 'photos'
+  let currentPlant = null;       // null = all-plants folder view
+  let currentPhotos = [];        // photos in current photo view
+  let lbIndex = 0;
 
-  let currentPlantId = null;
-
-  // ── Drag & drop ───────────────────────────────────────────────────────────
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dropZone.classList.remove('dragover');
-    handleFiles(Array.from(e.dataTransfer.files));
-  });
-
-  fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
-
-  // ── Upload handler ────────────────────────────────────────────────────────
-  async function handleFiles(files) {
-    const plant = plantInput.value.trim();
-    if (!plant) { showToast('Please enter a plant name first', true); return; }
-    if (!files.length) return;
-
-    uploadingOverlay.classList.add('show');
-    let successCount = 0;
-    let noDateFiles = [];
-
-    for (const file of files) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('plant', plant);
-      if (manualDate.value) formData.append('date', manualDate.value);
-
-      try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
-        const data = await res.json();
-
-        if (res.status === 422 && data.error === 'no_date') {
-          noDateFiles.push(file.name);
-        } else if (data.success) {
-          successCount++;
-        } else {
-          showToast(`Error: ${data.error}`, true);
-        }
-      } catch (err) {
-        showToast('Upload failed — is the server running?', true);
-      }
-    }
-
-    uploadingOverlay.classList.remove('show');
-
-    if (noDateFiles.length) {
-      document.getElementById('date-warning').style.display = 'block';
-      showToast(`Set the date above and retry: ${noDateFiles.join(', ')}`, true);
-    } else {
-      document.getElementById('date-warning').style.display = 'none';
-    }
-
-    if (successCount) {
-      showToast(`${successCount} photo${successCount > 1 ? 's' : ''} archived`);
-      fileInput.value = '';
-      await loadSidebar();
-      if (currentPlantId) {
-        loadPlantPhotos(currentPlantId, plant);
-      } else {
-        loadAll();
-      }
-    }
-  }
-
-  // ── Load sidebar plants ───────────────────────────────────────────────────
-  async function loadSidebar() {
-    const plants = await fetch('/api/plants').then(r => r.json());
-    const total = plants.reduce((s, p) => s + p.photo_count, 0);
-    totalCount.textContent = total;
-
-    plantList.innerHTML = plants.map(p => `
-      <div class="plant-item" onclick="loadPlantPhotos(${p.id}, '${p.name}', this)">
-        <span>${p.name}</span>
-        <span class="count">${p.photo_count}</span>
-      </div>
-    `).join('');
-  }
-
-  // ── Load all photos ───────────────────────────────────────────────────────
-  async function loadAll(btn) {
-    currentPlantId = null;
-    galleryTitle.textContent = 'All plants';
-    document.querySelectorAll('.plant-item').forEach(el => el.classList.remove('active'));
-    document.querySelector('.all-btn').classList.add('active');
-
-    const photos = await fetch('/api/photos').then(r => r.json());
-    galleryMeta.textContent = `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
-    renderPhotos(photos);
-  }
-
-  // ── Load photos for one plant ─────────────────────────────────────────────
-  async function loadPlantPhotos(plantId, plantName, el) {
-    currentPlantId = plantId;
-    galleryTitle.textContent = plantName;
-    document.querySelectorAll('.plant-item').forEach(i => i.classList.remove('active'));
-    document.querySelector('.all-btn').classList.remove('active');
-    if (el) el.classList.add('active');
-
-    const photos = await fetch(`/api/plants/${plantId}/photos`).then(r => r.json());
-    galleryMeta.textContent = `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
-    renderPhotos(photos);
-  }
-
-  // ── Render photo grid ─────────────────────────────────────────────────────
-  function renderPhotos(photos) {
-    if (!photos.length) {
-      photoGrid.innerHTML = '';
-      emptyState.style.display = 'block';
-      return;
-    }
-    emptyState.style.display = 'none';
-
-    photoGrid.innerHTML = photos.map(p => {
-      const imgSrc = `/uploads/${p.plant_name.replace(/ /g, '_')}/${p.stored_filename}`;
-      const date = p.date_taken
-        ? new Date(p.date_taken + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        : 'Unknown date';
-
-      return `
-        <div class="photo-card">
-          <img src="${imgSrc}" alt="${p.plant_name}" loading="lazy"
-               onerror="this.style.background='#EAF3DE';this.style.height='180px'">
-          <div class="photo-info">
-            <div class="photo-date">${date}</div>
-            <div class="photo-plant">${p.plant_name}</div>
-            ${!p.exif_found ? '<span class="no-exif-badge">date entered manually</span>' : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // ── Toast ─────────────────────────────────────────────────────────────────
-  function showToast(msg, isError = false) {
-    const toast = document.getElementById('toast');
-    toast.textContent = msg;
-    toast.className = 'show' + (isError ? ' error' : '');
-    clearTimeout(toast._t);
-    toast._t = setTimeout(() => toast.className = '', 3500);
-  }
+  const VIDEO_EXTS = new Set(['.mp4','.mov','.avi','.mkv','.m4v','.wmv','.flv','.webm','.3gp']);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   async function checkAuth() {
@@ -583,10 +528,367 @@
     window.location.href = '/';
   }
 
+  // ── Sidebar ───────────────────────────────────────────────────────────────
+  async function loadSidebar() {
+    allPlants = await fetch('/api/plants').then(r => r.json());
+    const total = allPlants.reduce((s, p) => s + p.photo_count, 0);
+    document.getElementById('total-count').textContent = total;
+
+    document.getElementById('plant-list').innerHTML = allPlants.map(p => `
+      <div class="plant-item" id="sidebar-plant-${p.id}"
+           onclick="openPlant(${p.id}, '${p.name}', this)"
+           ondragover="sidebarDragOver(event, ${p.id})"
+           ondragleave="sidebarDragLeave(${p.id})"
+           ondrop="sidebarDrop(event, '${p.name}')">
+        <span class="plant-label">${p.name}</span>
+        <span class="count">${p.photo_count}</span>
+      </div>
+    `).join('');
+  }
+
+  // ── Create empty folder ───────────────────────────────────────────────────
+  async function createFolder() {
+    const input = document.getElementById('new-folder-input');
+    const name = input.value.trim();
+    if (!name) { showToast('Enter a plant name', true); return; }
+
+    const res = await fetch('/api/plants', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      input.value = '';
+      showToast(`Folder "${name}" created`);
+      await loadSidebar();
+      if (currentPlant === null) renderFolderView();
+    } else {
+      showToast(data.error || 'Could not create folder', true);
+    }
+  }
+
+  document.getElementById('new-folder-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') createFolder();
+  });
+
+  // ── Views ─────────────────────────────────────────────────────────────────
+  function setView(v) {
+    currentView = v;
+    document.getElementById('btn-folder-view').classList.toggle('active', v === 'folders');
+    document.getElementById('btn-photo-view').classList.toggle('active', v === 'photos');
+
+    if (v === 'folders') {
+      if (currentPlant === null) renderFolderView();
+      else renderPhotoGrid(currentPhotos);
+    } else {
+      if (currentPlant === null) {
+        fetch('/api/photos').then(r => r.json()).then(photos => {
+          currentPhotos = photos;
+          renderPhotoGrid(photos);
+        });
+      } else {
+        renderPhotoGrid(currentPhotos);
+      }
+    }
+  }
+
+  // ── All-plants folder view ────────────────────────────────────────────────
+  async function showAllFolders(btn) {
+    currentPlant = null;
+    document.getElementById('gallery-title').textContent = 'All plants';
+    document.querySelectorAll('.plant-item').forEach(el => el.classList.remove('active'));
+    document.querySelector('.all-btn').classList.add('active');
+    await loadSidebar();
+
+    if (currentView === 'folders') {
+      renderFolderView();
+    } else {
+      const photos = await fetch('/api/photos').then(r => r.json());
+      currentPhotos = photos;
+      renderPhotoGrid(photos);
+    }
+  }
+
+  function renderFolderView() {
+    const area = document.getElementById('content-area');
+    const empty = document.getElementById('empty-state');
+    document.getElementById('gallery-meta').textContent = `${allPlants.length} folder${allPlants.length !== 1 ? 's' : ''}`;
+
+    if (!allPlants.length) {
+      area.innerHTML = '';
+      empty.style.display = 'block';
+      document.getElementById('empty-msg').textContent = 'No plants yet — create a folder or drop photos above';
+      return;
+    }
+    empty.style.display = 'none';
+
+    area.innerHTML = `<div class="folder-grid">${allPlants.map(p => `
+      <div class="folder-card" id="folder-card-${p.id}"
+           onclick="openPlant(${p.id}, '${p.name}')"
+           ondragover="folderDragOver(event, ${p.id})"
+           ondragleave="folderDragLeave(${p.id})"
+           ondrop="sidebarDrop(event, '${p.name}')">
+        <span class="folder-icon">🌿</span>
+        <div class="folder-name">${p.name}</div>
+        <div class="folder-count">${p.photo_count} photo${p.photo_count !== 1 ? 's' : ''}</div>
+      </div>
+    `).join('')}</div>`;
+  }
+
+  // ── Open a plant folder ───────────────────────────────────────────────────
+  async function openPlant(plantId, plantName, sidebarEl) {
+    currentPlant = { id: plantId, name: plantName };
+    document.getElementById('gallery-title').textContent = plantName;
+    document.querySelectorAll('.plant-item').forEach(el => el.classList.remove('active'));
+    document.querySelector('.all-btn').classList.remove('active');
+    if (sidebarEl) sidebarEl.classList.add('active');
+    else {
+      const el = document.getElementById(`sidebar-plant-${plantId}`);
+      if (el) el.classList.add('active');
+    }
+
+    // auto-fill plant name in upload box
+    document.getElementById('plant-input').value = plantName;
+
+    const photos = await fetch(`/api/plants/${plantId}/photos`).then(r => r.json());
+    currentPhotos = photos;
+
+    if (currentView === 'folders') setView('photos');
+    else renderPhotoGrid(photos);
+  }
+
+  // ── Photo grid ────────────────────────────────────────────────────────────
+  function renderPhotoGrid(photos) {
+    const area = document.getElementById('content-area');
+    const empty = document.getElementById('empty-state');
+    document.getElementById('gallery-meta').textContent = `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
+
+    if (!photos.length) {
+      area.innerHTML = '';
+      empty.style.display = 'block';
+      document.getElementById('empty-msg').textContent = 'No photos in this folder yet — drop some above';
+      return;
+    }
+    empty.style.display = 'none';
+
+    area.innerHTML = `<div class="photo-grid">${photos.map((p, i) => {
+      const imgSrc = `/uploads/user_${getUserId()}/` + p.plant_name.replace(/ /g,'_') + '/' + p.stored_filename;
+      const date = p.date_taken
+        ? new Date(p.date_taken + 'T00:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})
+        : 'Unknown date';
+      return `
+        <div class="photo-card" onclick="openLightbox(${i})">
+          <img src="${imgSrc}" alt="${p.plant_name}" loading="lazy"
+               onerror="this.style.background='#EAF3DE';this.style.height='175px'">
+          <div class="photo-info">
+            <div class="photo-date">${date}</div>
+            <div class="photo-plant">${p.plant_name}</div>
+            ${!p.exif_found ? '<span class="no-exif-badge">manual date</span>' : ''}
+          </div>
+        </div>`;
+    }).join('')}</div>`;
+  }
+
+  let _userId = null;
+  function getUserId() {
+    // cached from checkAuth
+    return _userId;
+  }
+
+  // ── Lightbox ──────────────────────────────────────────────────────────────
+  function openLightbox(i) {
+    lbIndex = i;
+    showLbPhoto();
+    document.getElementById('lightbox').classList.add('show');
+  }
+  function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
+  function lbNav(dir) { lbIndex = (lbIndex + dir + currentPhotos.length) % currentPhotos.length; showLbPhoto(); }
+
+  function showLbPhoto() {
+    const p = currentPhotos[lbIndex];
+    const imgSrc = `/uploads/user_${_userId}/` + p.plant_name.replace(/ /g,'_') + '/' + p.stored_filename;
+    document.getElementById('lb-img').src = imgSrc;
+    document.getElementById('lb-date').textContent = p.date_taken
+      ? new Date(p.date_taken + 'T00:00:00').toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})
+      : 'Unknown date';
+    document.getElementById('lb-plant').textContent = p.plant_name;
+  }
+
+  document.getElementById('lightbox').addEventListener('click', function(e) {
+    if (e.target === this) closeLightbox();
+  });
+
+  // ── File upload ───────────────────────────────────────────────────────────
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const folderInput = document.getElementById('folder-input');
+
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', async e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = await collectDroppedFiles(e.dataTransfer);
+    handleFiles(files);
+  });
+
+  fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
+  folderInput.addEventListener('change', () => handleFiles(Array.from(folderInput.files)));
+
+  // Collect files from a dataTransfer, including folder contents
+  async function collectDroppedFiles(dataTransfer) {
+    const files = [];
+    const items = Array.from(dataTransfer.items || []);
+
+    for (const item of items) {
+      if (item.kind !== 'file') continue;
+      const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+      if (entry && entry.isDirectory) {
+        const dirFiles = await readDirectoryFiles(entry);
+        files.push(...dirFiles);
+      } else {
+        const f = item.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+
+    return files.length ? files : Array.from(dataTransfer.files || []);
+  }
+
+  function readDirectoryFiles(dirEntry) {
+    return new Promise(resolve => {
+      const results = [];
+      const reader = dirEntry.createReader();
+      function readBatch() {
+        reader.readEntries(async entries => {
+          if (!entries.length) { resolve(results); return; }
+          for (const entry of entries) {
+            if (entry.isFile) {
+              const f = await new Promise(res => entry.file(res));
+              results.push(f);
+            } else if (entry.isDirectory) {
+              const sub = await readDirectoryFiles(entry);
+              results.push(...sub);
+            }
+          }
+          readBatch();
+        });
+      }
+      readBatch();
+    });
+  }
+
+  async function handleFiles(files) {
+    const plant = document.getElementById('plant-input').value.trim();
+    if (!plant) { showToast('Enter a plant name first', true); return; }
+    if (!files.length) return;
+
+    // Filter videos — show one warning for the whole batch
+    const videoFiles = files.filter(f => VIDEO_EXTS.has(extOf(f.name)));
+    const uploadFiles = files.filter(f => !VIDEO_EXTS.has(extOf(f.name)));
+
+    if (videoFiles.length) showToast('Can not handle videos', 'warn');
+    if (!uploadFiles.length) return;
+
+    document.getElementById('uploading-overlay').classList.add('show');
+    let successCount = 0;
+    let noDateFiles = [];
+
+    for (const file of uploadFiles) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('plant', plant);
+      const dateVal = document.getElementById('manual-date').value;
+      if (dateVal) formData.append('date', dateVal);
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (res.status === 422 && data.error === 'no_date') {
+          noDateFiles.push(file.name);
+        } else if (data.success) {
+          successCount++;
+        } else if (data.error !== 'video') {
+          showToast(`Error: ${data.error}`, true);
+        }
+      } catch {
+        showToast('Upload failed — is the server running?', true);
+      }
+    }
+
+    document.getElementById('uploading-overlay').classList.remove('show');
+
+    if (noDateFiles.length) {
+      document.getElementById('date-warning').style.display = 'block';
+      showToast(`Set a date and retry: ${noDateFiles.slice(0,3).join(', ')}${noDateFiles.length > 3 ? '…' : ''}`, true);
+    } else {
+      document.getElementById('date-warning').style.display = 'none';
+    }
+
+    if (successCount) {
+      showToast(`${successCount} photo${successCount > 1 ? 's' : ''} archived`);
+      fileInput.value = '';
+      folderInput.value = '';
+      await loadSidebar();
+      if (currentPlant) openPlant(currentPlant.id, currentPlant.name);
+      else showAllFolders();
+    }
+  }
+
+  function extOf(filename) {
+    return filename.slice(filename.lastIndexOf('.')).toLowerCase();
+  }
+
+  // ── Drag photos onto folder cards / sidebar items ─────────────────────────
+  function folderDragOver(e, plantId) {
+    e.preventDefault();
+    document.getElementById(`folder-card-${plantId}`)?.classList.add('drag-target');
+  }
+  function folderDragLeave(plantId) {
+    document.getElementById(`folder-card-${plantId}`)?.classList.remove('drag-target');
+  }
+  function sidebarDragOver(e, plantId) {
+    e.preventDefault();
+    document.getElementById(`sidebar-plant-${plantId}`)?.classList.add('drag-target');
+  }
+  function sidebarDragLeave(plantId) {
+    document.getElementById(`sidebar-plant-${plantId}`)?.classList.remove('drag-target');
+  }
+  async function sidebarDrop(e, plantName) {
+    e.preventDefault();
+    e.stopPropagation();
+    // clear highlights
+    document.querySelectorAll('.drag-target').forEach(el => el.classList.remove('drag-target'));
+    // set the plant name and process
+    document.getElementById('plant-input').value = plantName;
+    const files = await collectDroppedFiles(e.dataTransfer);
+    handleFiles(files);
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(msg, type = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'show' + (type === true ? ' error' : type === 'warn' ? ' warn' : '');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toast.className = '', 3500);
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
-  checkAuth();
-  loadSidebar();
-  loadAll();
+  async function init() {
+    const res = await fetch('/api/me');
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const user = await res.json();
+    _userId = user.id;
+    document.getElementById('username-display').textContent = user.username;
+    await loadSidebar();
+    renderFolderView();
+  }
+
+  init();
 </script>
 </body>
 </html>
