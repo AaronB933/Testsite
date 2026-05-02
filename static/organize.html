@@ -1,143 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Plant Archive — Organize</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 </head>
 <body>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --green-50:#EAF3DE;--green-100:#C0DD97;--green-200:#97C459;
-    --green-600:#3B6D11;--green-800:#27500A;--green-900:#173404;
-    --amber-50:#FAEEDA;--amber-400:#BA7517;
-    --gray-50:#F1EFE8;--gray-100:#D3D1C7;--gray-200:#B4B2A9;
-    --gray-600:#5F5E5A;--gray-800:#444441;
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --g50:#EAF3DE;--g100:#C0DD97;--g200:#97C459;--g600:#3B6D11;--g800:#27500A;--g900:#173404;
+    --a50:#FAEEDA;--a400:#BA7517;
+    --gray50:#F1EFE8;--gray100:#D3D1C7;--gray200:#B4B2A9;--gray600:#5F5E5A;--gray800:#444441;
   }
-  body { font-family:'DM Sans',sans-serif; background:#f7f5f0; color:var(--gray-800); min-height:100vh; }
-  nav { background:var(--green-900); display:flex; align-items:center; padding:0 2rem; height:60px; position:sticky; top:0; z-index:100; }
-  nav .brand { font-family:'Playfair Display',serif; font-size:1.25rem; font-weight:400; color:var(--green-50); margin-right:2rem; }
-  nav .nav-links { display:flex; gap:0.25rem; flex:1; }
-  nav a { color:rgba(234,243,222,0.6); text-decoration:none; font-size:0.875rem; font-weight:500; padding:0.4rem 0.9rem; border-radius:8px; transition:background 0.15s,color 0.15s; }
-  nav a:hover,nav a.active { background:rgba(255,255,255,0.12); color:var(--green-50); }
-  nav .user-area { display:flex; align-items:center; gap:0.75rem; margin-left:auto; }
-  nav .username { font-size:0.8rem; color:rgba(234,243,222,0.5); }
-  nav .logout-btn { background:rgba(255,255,255,0.1); border:none; color:var(--green-50); padding:0.35rem 0.85rem; border-radius:8px; font-family:inherit; font-size:0.8rem; cursor:pointer; }
-  #toast { position:fixed; bottom:2rem; right:2rem; padding:0.7rem 1.2rem; border-radius:10px; font-size:0.875rem; opacity:0; transform:translateY(10px); transition:opacity 0.25s,transform 0.25s; pointer-events:none; z-index:999; max-width:340px; background:var(--green-800); color:var(--green-50); }
-  #toast.show { opacity:1; transform:translateY(0); }
-  #toast.toast-error { background:#A32D2D; }
-  #toast.toast-warn { background:var(--amber-400); }
-  #toast.toast-info { background:var(--green-600); }
-  #spinner-overlay { display:none; position:fixed; inset:0; background:rgba(23,52,4,0.3); z-index:500; align-items:center; justify-content:center; }
-  #spinner-overlay.show { display:flex; }
-  .spinner-box { background:white; border-radius:16px; padding:2rem 2.5rem; text-align:center; font-family:'Playfair Display',serif; font-size:1rem; color:var(--green-800); }
-  .spinner { width:30px; height:30px; border:3px solid var(--green-100); border-top-color:var(--green-600); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 0.75rem; }
-  @keyframes spin { to { transform:rotate(360deg); } }
+  body{font-family:'DM Sans',sans-serif;background:#f7f5f0;color:var(--gray800);min-height:100vh;user-select:none;}
 
-  .layout { display:grid; grid-template-columns:240px 1fr; min-height:calc(100vh - 60px); }
+  /* Nav */
+  nav{background:var(--g900);display:flex;align-items:center;padding:0 2rem;height:60px;position:sticky;top:0;z-index:100;}
+  nav .brand{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:400;color:var(--g50);margin-right:2rem;}
+  nav .nav-links{display:flex;gap:.25rem;flex:1;}
+  nav a{color:rgba(234,243,222,.6);text-decoration:none;font-size:.875rem;font-weight:500;padding:.4rem .9rem;border-radius:8px;transition:background .15s,color .15s;}
+  nav a:hover,nav a.active{background:rgba(255,255,255,.12);color:var(--g50);}
+  nav .user-area{display:flex;align-items:center;gap:.75rem;margin-left:auto;}
+  nav .username{font-size:.8rem;color:rgba(234,243,222,.5);}
+  nav .logout-btn{background:rgba(255,255,255,.1);border:none;color:var(--g50);padding:.35rem .85rem;border-radius:8px;font-family:inherit;font-size:.8rem;cursor:pointer;}
+
+  /* Toast/Spinner */
+  #toast{position:fixed;bottom:2rem;right:2rem;padding:.7rem 1.2rem;border-radius:10px;font-size:.875rem;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;pointer-events:none;z-index:9999;max-width:340px;background:var(--g800);color:var(--g50);}
+  #toast.show{opacity:1;transform:translateY(0);}
+  #toast.toast-error{background:#A32D2D;}#toast.toast-warn{background:var(--a400);}#toast.toast-info{background:var(--g600);}
+  #spinner-overlay{display:none;position:fixed;inset:0;background:rgba(23,52,4,.3);z-index:500;align-items:center;justify-content:center;}
+  #spinner-overlay.show{display:flex;}
+  .spinner-box{background:white;border-radius:16px;padding:2rem 2.5rem;text-align:center;font-family:'Playfair Display',serif;font-size:1rem;color:var(--g800);}
+  .spinner{width:30px;height:30px;border:3px solid var(--g100);border-top-color:var(--g600);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto .75rem;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* Layout */
+  .layout{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 60px);}
 
   /* Sidebar */
-  .sidebar { background:white; border-right:1px solid var(--gray-100); padding:1.25rem 1rem; }
-  .sb-label { font-size:0.68rem; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:var(--gray-200); padding:0.5rem 0.75rem 0.25rem; }
-  .sb-item { display:flex; align-items:center; justify-content:space-between; padding:0.5rem 0.75rem; border-radius:8px; cursor:pointer; font-size:0.875rem; transition:background 0.15s; }
-  .sb-item:hover { background:var(--green-50); }
-  .sb-item.active { background:var(--green-50); color:var(--green-800); font-weight:500; }
-  .sb-count { font-size:0.72rem; color:var(--gray-200); background:var(--gray-50); padding:2px 7px; border-radius:20px; }
-  .sb-item.active .sb-count { background:var(--green-100); color:var(--green-800); }
+  .sidebar{background:white;border-right:1px solid var(--gray100);padding:1rem 0;overflow-y:auto;}
+  .sb-section{font-size:.67rem;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--gray200);padding:.75rem 1rem .3rem;}
+  .sb-item{display:flex;align-items:center;justify-content:space-between;padding:.5rem 1rem;cursor:pointer;font-size:.875rem;transition:background .12s;gap:.5rem;}
+  .sb-item:hover{background:var(--g50);}
+  .sb-item.active{background:var(--g50);color:var(--g800);font-weight:500;}
+  .sb-count{font-size:.7rem;color:var(--gray200);background:var(--gray50);padding:1px 7px;border-radius:20px;flex-shrink:0;}
+  .sb-item.active .sb-count{background:var(--g100);color:var(--g800);}
 
-  .season-item { display:flex; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; border-radius:8px; cursor:pointer; font-size:0.875rem; transition:background 0.15s; text-decoration:none; color:var(--gray-800); }
-  .season-item:hover { background:var(--green-50); }
-  .season-item.active { background:var(--green-50); font-weight:500; }
+  /* Year tree */
+  .tree-row{display:flex;align-items:center;justify-content:space-between;padding:.45rem 1rem .45rem .75rem;cursor:pointer;font-size:.875rem;font-weight:500;transition:background .12s;gap:.5rem;}
+  .tree-row:hover{background:var(--gray50);}
+  .tree-row.active{background:var(--g50);color:var(--g800);}
+  .tree-row .tl{display:flex;align-items:center;gap:.4rem;}
+  .chevron{font-size:.65rem;transition:transform .2s;color:var(--gray200);}
+  .tree-row.open .chevron{transform:rotate(90deg);}
+  .tree-total{font-size:.7rem;color:var(--gray200);background:var(--gray50);padding:1px 7px;border-radius:20px;}
+  .tree-row.active .tree-total{background:var(--g100);color:var(--g800);}
+  .sub-rows{display:none;}
+  .sub-rows.open{display:block;}
+  .sub-row{display:flex;align-items:center;justify-content:space-between;padding:.4rem 1rem .4rem 2rem;cursor:pointer;font-size:.82rem;transition:background .12s;gap:.5rem;}
+  .sub-row:hover{background:var(--g50);}
+  .sub-row.active{background:var(--g50);color:var(--g800);font-weight:500;}
+  .sub-row .sl{display:flex;align-items:center;gap:.4rem;}
 
-  /* Season organize box */
-  .organize-box {
-    background: linear-gradient(135deg, var(--green-900), var(--green-800));
-    border-radius: 12px;
-    padding: 1.25rem;
-    margin-top: 1rem;
-    color: var(--green-50);
-  }
-  .organize-box h4 { font-family:'Playfair Display',serif; font-size:0.95rem; font-weight:400; margin-bottom:0.4rem; }
-  .organize-box p { font-size:0.75rem; color:rgba(234,243,222,0.6); margin-bottom:0.85rem; line-height:1.5; }
-  .btn-organize { width:100%; padding:0.55rem; background:var(--green-50); color:var(--green-900); border:none; border-radius:8px; font-family:inherit; font-size:0.85rem; font-weight:600; cursor:pointer; transition:opacity 0.15s; }
-  .btn-organize:hover { opacity:0.88; }
+  /* Plant tree — variety sub-rows indented further */
+  .variety-row{display:flex;align-items:center;justify-content:space-between;padding:.38rem 1rem .38rem 2.5rem;cursor:pointer;font-size:.8rem;transition:background .12s;gap:.5rem;color:var(--gray600);}
+  .variety-row:hover{background:var(--g50);}
+  .variety-row.active{background:var(--g50);color:var(--g800);font-weight:500;}
+  .variety-row .vl{display:flex;align-items:center;gap:.35rem;}
+
+  /* Organize boxes */
+  .org-box{margin:1rem;border-radius:12px;padding:1.1rem;color:var(--g50);}
+  .org-box.season-box{background:linear-gradient(135deg,var(--g900),var(--g800));}
+  .org-box.plant-box{background:linear-gradient(135deg,#2D5A1B,#4A8A2D);}
+  .org-box h4{font-family:'Playfair Display',serif;font-size:.9rem;font-weight:400;margin-bottom:.35rem;}
+  .org-box p{font-size:.73rem;color:rgba(234,243,222,.65);margin-bottom:.8rem;line-height:1.5;}
+  .btn-org{width:100%;padding:.5rem;background:var(--g50);color:var(--g900);border:none;border-radius:8px;font-family:inherit;font-size:.82rem;font-weight:600;cursor:pointer;}
+  .btn-org:hover{opacity:.88;}
 
   /* Main */
-  .main { padding:1.75rem 2rem; }
+  .main{padding:1.75rem 2rem;min-width:0;position:relative;}
+  .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem;}
+  .toolbar-left{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;}
+  .toolbar-title{font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:400;}
+  .toolbar-count{font-size:.8rem;color:var(--gray200);}
+  .toolbar-right{display:flex;align-items:center;gap:.6rem;}
+  .btn{padding:.45rem 1rem;border-radius:8px;font-family:inherit;font-size:.85rem;font-weight:500;cursor:pointer;border:none;transition:background .15s;}
+  .btn-ghost{background:var(--gray50);color:var(--gray600);border:1px solid var(--gray100);}
+  .btn-green{background:var(--g800);color:var(--g50);}
+  .btn-green:hover{background:var(--g900);}
+  .btn-red{background:#A32D2D;color:white;}
+  .btn-red:hover{background:#7A1A1A;}
 
-  /* Toolbar */
-  .toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-  .toolbar-left { display:flex; align-items:center; gap:0.75rem; }
-  .toolbar-title { font-family:'Playfair Display',serif; font-size:1.3rem; font-weight:400; text-transform:capitalize; }
-  .toolbar-count { font-size:0.8rem; color:var(--gray-200); }
-
-  .toolbar-right { display:flex; align-items:center; gap:0.6rem; }
-
-  .btn { padding:0.45rem 1rem; border-radius:8px; font-family:inherit; font-size:0.85rem; font-weight:500; cursor:pointer; border:none; transition:background 0.15s; }
-  .btn-select { background:var(--gray-50); color:var(--gray-800); border:1px solid var(--gray-100); }
-  .btn-select:hover { background:var(--gray-100); }
-  .btn-select.active { background:var(--green-50); color:var(--green-800); border-color:var(--green-100); }
-  .btn-green { background:var(--green-800); color:var(--green-50); }
-  .btn-green:hover { background:var(--green-900); }
-  .btn-cancel { background:var(--gray-50); color:var(--gray-600); border:1px solid var(--gray-100); }
-
-  /* Label bar (shows when photos selected) */
-  .label-bar {
-    display: none;
-    background: white;
-    border: 1px solid var(--gray-100);
-    border-radius: 12px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-    align-items: center;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-  }
-  .label-bar.show { display:flex; }
-  .label-bar .sel-count { font-size:0.85rem; color:var(--gray-600); white-space:nowrap; }
-  .label-bar input { flex:1; min-width:160px; padding:0.4rem 0.75rem; border:1px solid var(--gray-100); border-radius:8px; font-family:inherit; font-size:0.85rem; outline:none; }
-  .label-bar input:focus { border-color:var(--green-200); }
+  /* Selection bar */
+  .sel-bar{display:none;background:white;border:1px solid var(--gray100);border-radius:12px;padding:.65rem 1rem;margin-bottom:1rem;align-items:center;gap:.75rem;flex-wrap:wrap;}
+  .sel-bar.show{display:flex;}
+  .sel-bar .sel-count{font-size:.85rem;color:var(--gray600);white-space:nowrap;font-weight:500;}
 
   /* Photo grid */
-  .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:0.85rem; }
-  .photo-card { background:white; border-radius:12px; overflow:hidden; border:1px solid var(--gray-100); transition:transform 0.15s,box-shadow 0.15s; position:relative; cursor:pointer; }
-  .photo-card:hover { transform:translateY(-2px); box-shadow:0 5px 18px rgba(23,52,4,0.1); }
-  .photo-card img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
-  .photo-card .info { padding:0.5rem 0.65rem; }
-  .photo-card .p-date { font-size:0.78rem; font-weight:500; color:var(--green-800); }
-  .photo-card .p-label { font-size:0.7rem; color:var(--gray-200); margin-top:2px; text-transform:capitalize; }
+  .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.85rem;position:relative;}
+  .photo-card{background:white;border-radius:12px;overflow:hidden;border:2px solid transparent;transition:transform .12s,box-shadow .12s,border-color .12s;position:relative;cursor:pointer;}
+  .photo-card:hover{transform:translateY(-2px);box-shadow:0 5px 18px rgba(23,52,4,.1);}
+  .photo-card.selected{border-color:var(--g600);box-shadow:0 0 0 1px var(--g600);}
+  .photo-card.selected::after{content:'';position:absolute;inset:0;background:rgba(59,109,17,.08);pointer-events:none;}
+  .photo-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;pointer-events:none;}
+  .photo-card .info{padding:.5rem .65rem;}
+  .photo-card .p-date{font-size:.78rem;font-weight:500;color:var(--g800);}
+  .photo-card .p-label{font-size:.7rem;color:var(--gray200);margin-top:2px;text-transform:capitalize;}
+  .photo-card .p-variety{font-size:.68rem;color:var(--g600);font-style:italic;margin-top:1px;}
+  .photo-card .sel-check{display:none;position:absolute;top:6px;left:6px;width:22px;height:22px;background:var(--g600);border-radius:50%;align-items:center;justify-content:center;color:white;font-size:.75rem;}
+  .photo-card.selected .sel-check{display:flex;}
 
-  /* checkbox */
-  .photo-card .cb-wrap { position:absolute; top:6px; left:6px; display:none; }
-  .select-mode .photo-card .cb-wrap { display:block; }
-  .photo-card .cb-wrap input { width:18px; height:18px; accent-color:var(--green-600); cursor:pointer; }
-  .photo-card.selected { outline:2.5px solid var(--green-600); }
-  .photo-card.selected::after { content:''; position:absolute; inset:0; background:rgba(59,109,17,0.07); pointer-events:none; }
+  /* Badges */
+  .season-badge{display:inline-block;font-size:.62rem;font-weight:600;padding:2px 5px;border-radius:4px;margin-top:3px;text-transform:capitalize;}
+  .badge-spring{background:#D4EDD3;color:#2D6B2B;}
+  .badge-summer{background:#FDE9BF;color:#7A4F0A;}
+  .badge-fall{background:#F5D5C5;color:#7A2A0A;}
+  .badge-winter{background:#D0E4F5;color:#1A4A6E;}
 
-  /* season badges */
-  .season-badge { display:inline-block; font-size:0.62rem; font-weight:600; padding:2px 5px; border-radius:4px; margin-top:3px; text-transform:capitalize; }
-  .badge-spring { background:#D4EDD3; color:#2D6B2B; }
-  .badge-summer { background:#FDE9BF; color:#7A4F0A; }
-  .badge-fall   { background:#F5D5C5; color:#7A2A0A; }
-  .badge-winter { background:#D0E4F5; color:#1A4A6E; }
+  .empty-state{text-align:center;padding:3.5rem 2rem;color:var(--gray200);}
+  .empty-state .icon{font-size:2.5rem;margin-bottom:.75rem;}
+  .empty-state p{font-size:.875rem;}
 
-  .empty-state { text-align:center; padding:3.5rem 2rem; color:var(--gray-200); }
-  .empty-state .icon { font-size:2.5rem; margin-bottom:0.75rem; }
-  .empty-state p { font-size:0.875rem; }
+  /* Drag select */
+  #drag-select-box{display:none;position:fixed;border:1.5px solid var(--g600);background:rgba(59,109,17,.08);border-radius:4px;pointer-events:none;z-index:200;}
 
-  /* label chips in sidebar */
-  .label-chip { display:inline-block; background:var(--green-50); color:var(--green-800); font-size:0.72rem; padding:2px 8px; border-radius:12px; margin:1px; cursor:pointer; text-transform:capitalize; border:1px solid var(--green-100); }
-  .label-chip:hover { background:var(--green-100); }
+  /* Context menu */
+  #ctx-menu{display:none;position:fixed;background:white;border:1px solid var(--gray100);border-radius:10px;padding:.4rem 0;box-shadow:0 8px 30px rgba(0,0,0,.12);z-index:1000;min-width:180px;}
+  #ctx-menu.show{display:block;}
+  .ctx-item{display:flex;align-items:center;gap:.6rem;padding:.5rem 1rem;font-size:.875rem;cursor:pointer;transition:background .1s;color:var(--gray800);}
+  .ctx-item:hover{background:var(--g50);}
+  .ctx-item.danger{color:#A32D2D;}
+  .ctx-item.danger:hover{background:#FFF0F0;}
+  .ctx-sep{height:1px;background:var(--gray100);margin:.3rem 0;}
+  .ctx-icon{font-size:1rem;width:18px;text-align:center;}
+
+  /* Label/Variety popup */
+  #label-popup{display:none;position:fixed;background:white;border:1px solid var(--gray100);border-radius:14px;padding:1.25rem;box-shadow:0 8px 30px rgba(0,0,0,.14);z-index:1001;width:280px;}
+  #label-popup.show{display:block;}
+  #label-popup h4{font-family:'Playfair Display',serif;font-size:1rem;font-weight:400;margin-bottom:.85rem;color:var(--g800);}
+  .popup-field{margin-bottom:.75rem;}
+  .popup-field label{display:block;font-size:.75rem;font-weight:500;color:var(--gray600);margin-bottom:.3rem;}
+  .popup-field input{width:100%;padding:.45rem .75rem;border:1px solid var(--gray100);border-radius:8px;font-family:inherit;font-size:.875rem;outline:none;}
+  .popup-field input:focus{border-color:var(--g200);}
+  .popup-field .hint{font-size:.7rem;color:var(--gray200);margin-top:.25rem;}
+  .popup-actions{display:flex;gap:.4rem;margin-top:.85rem;}
+  .popup-actions button{flex:1;padding:.45rem;border-radius:8px;font-family:inherit;font-size:.82rem;font-weight:500;cursor:pointer;border:none;}
+  .pop-ok{background:var(--g800);color:var(--g50);}
+  .pop-cancel{background:var(--gray50);color:var(--gray600);border:1px solid var(--gray100)!important;}
+
+  /* Variety-only popup */
+  #variety-popup{display:none;position:fixed;background:white;border:1px solid var(--gray100);border-radius:14px;padding:1.25rem;box-shadow:0 8px 30px rgba(0,0,0,.14);z-index:1001;width:260px;}
+  #variety-popup.show{display:block;}
+  #variety-popup h4{font-family:'Playfair Display',serif;font-size:1rem;font-weight:400;margin-bottom:.75rem;color:var(--g800);}
+  #variety-popup input{width:100%;padding:.45rem .75rem;border:1px solid var(--gray100);border-radius:8px;font-family:inherit;font-size:.875rem;outline:none;margin-bottom:.75rem;}
+  #variety-popup input:focus{border-color:var(--g200);}
+  #variety-popup .popup-actions{display:flex;gap:.4rem;}
+  #variety-popup .popup-actions button{flex:1;padding:.45rem;border-radius:8px;font-family:inherit;font-size:.82rem;font-weight:500;cursor:pointer;border:none;}
+
+  /* Lightbox */
+  #lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:2000;align-items:center;justify-content:center;flex-direction:column;}
+  #lightbox.show{display:flex;}
+  #lightbox img{max-width:90vw;max-height:82vh;object-fit:contain;border-radius:8px;}
+  .lb-close{position:absolute;top:1.25rem;right:1.5rem;background:rgba(255,255,255,.12);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .lb-meta{margin-top:.85rem;text-align:center;}
+  .lb-date{font-family:'Playfair Display',serif;font-size:1rem;color:white;}
+  .lb-info{font-size:.78rem;color:rgba(255,255,255,.5);margin-top:3px;text-transform:capitalize;}
+  .lb-nav{display:flex;gap:.75rem;margin-top:.75rem;}
+  .lb-nav button{background:rgba(255,255,255,.12);border:none;color:white;width:40px;height:40px;border-radius:50%;font-size:1rem;cursor:pointer;}
+
+  /* Confirm */
+  #confirm-dialog{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:3000;align-items:center;justify-content:center;}
+  #confirm-dialog.show{display:flex;}
+  .confirm-box{background:white;border-radius:16px;padding:1.75rem 2rem;max-width:380px;width:90%;}
+  .confirm-box h3{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:400;margin-bottom:.5rem;}
+  .confirm-box p{font-size:.85rem;color:var(--gray600);margin-bottom:1.25rem;line-height:1.5;}
+  .confirm-actions{display:flex;gap:.6rem;justify-content:flex-end;}
 </style>
 
 <nav>
@@ -154,299 +194,570 @@
 </nav>
 
 <div class="layout">
-
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="sb-label">Labels</div>
-    <div class="sb-item active" id="sb-all" onclick="loadView('all', this)">
-      All photos <span class="sb-count" id="sb-all-count">0</span>
-    </div>
-    <div class="sb-item" id="sb-inbox" onclick="loadView('inbox', this)">
-      📥 Inbox <span class="sb-count" id="sb-inbox-count">0</span>
-    </div>
+    <div class="sb-section">Labels</div>
+    <div class="sb-item active" id="sb-all" onclick="loadView('all',this)">All photos <span class="sb-count" id="sb-all-count">0</span></div>
+    <div class="sb-item" id="sb-inbox" onclick="loadView('inbox',this)">📥 Inbox <span class="sb-count" id="sb-inbox-count">0</span></div>
     <div id="label-list"></div>
 
-    <div class="sb-label" style="margin-top:1rem;">Seasons</div>
-    <div class="sb-item" id="sb-spring" onclick="loadView('season:spring', this)">🌸 Spring <span class="sb-count" id="s-spring">0</span></div>
-    <div class="sb-item" id="sb-summer" onclick="loadView('season:summer', this)">☀️ Summer <span class="sb-count" id="s-summer">0</span></div>
-    <div class="sb-item" id="sb-fall"   onclick="loadView('season:fall',   this)">🍂 Fall   <span class="sb-count" id="s-fall">0</span></div>
-    <div class="sb-item" id="sb-winter" onclick="loadView('season:winter', this)">❄️ Winter <span class="sb-count" id="s-winter">0</span></div>
+    <div class="sb-section" style="margin-top:.5rem;">By Plant</div>
+    <div id="plant-tree"></div>
 
-    <div class="organize-box">
-      <h4>🗂 Organize by Season</h4>
-      <p>Copies all photos into season folders based on the date they were taken.</p>
-      <button class="btn-organize" onclick="runOrganize()">Organize All Now</button>
+    <div class="org-box plant-box">
+      <h4>🌿 Organize Plant Folders</h4>
+      <p>Copies labeled photos into plant › variety folders on disk.</p>
+      <button class="btn-org" onclick="runPlantOrganize()">Organize Plants Now</button>
     </div>
+
+    <div class="sb-section" style="margin-top:.5rem;">By Year & Season</div>
+    <div id="year-tree"></div>
+
+    <div class="org-box season-box">
+      <h4>🗂 Organize by Year & Season</h4>
+      <p>Copies photos into year › season folders based on date taken.</p>
+      <button class="btn-org" onclick="runSeasonOrganize()">Organize Seasons Now</button>
+    </div>
+
+    <div class="sb-section" style="margin-top:.5rem;">Other</div>
+    <div class="sb-item" id="sb-trash" onclick="loadView('trash',this)">🗑 Trash <span class="sb-count" id="sb-trash-count">0</span></div>
   </aside>
 
   <!-- Main -->
-  <main class="main">
-
-    <!-- Toolbar -->
+  <main class="main" id="main-area">
     <div class="toolbar">
       <div class="toolbar-left">
         <div class="toolbar-title" id="view-title">All photos</div>
         <div class="toolbar-count" id="view-count"></div>
       </div>
-      <div class="toolbar-right">
-        <button class="btn btn-select" id="btn-select" onclick="toggleSelectMode()">Select</button>
-        <button class="btn btn-cancel" id="btn-cancel" onclick="cancelSelect()" style="display:none">Cancel</button>
-      </div>
+      <div class="toolbar-right" id="toolbar-right"></div>
     </div>
 
-    <!-- Label assignment bar -->
-    <div class="label-bar" id="label-bar">
+    <div class="sel-bar" id="sel-bar">
       <span class="sel-count" id="sel-count">0 selected</span>
-      <input type="text" id="label-input" placeholder="Enter label name..." />
-      <button class="btn btn-green" onclick="applyLabel()">Apply Label</button>
-      <button class="btn btn-cancel" onclick="cancelSelect()">Cancel</button>
+      <button class="btn btn-ghost" onclick="selectAll()">Select all</button>
+      <button class="btn btn-ghost" onclick="clearSelection()">Clear</button>
+      <button class="btn btn-green" onclick="showLabelPopup()">🏷 Label</button>
+      <button class="btn btn-green" onclick="showVarietyPopup()">🌸 Variety</button>
+      <button class="btn btn-ghost" onclick="downloadSelected()">⬇ Download</button>
+      <button class="btn btn-red" onclick="trashSelected()">🗑 Delete</button>
     </div>
 
-    <!-- Photo grid -->
-    <div id="grid-wrap">
-      <div class="empty-state">
-        <div class="icon">🌱</div>
-        <p>Loading...</p>
-      </div>
-    </div>
-
+    <div id="grid-wrap"></div>
   </main>
+</div>
+
+<!-- Context menu -->
+<div id="ctx-menu"></div>
+
+<!-- Label popup -->
+<div id="label-popup">
+  <h4>🏷 Label Photos</h4>
+  <div class="popup-field">
+    <label>Plant name <span style="color:#A32D2D">*</span></label>
+    <input type="text" id="lp-label" placeholder="e.g. tulip, rose..." />
+  </div>
+  <div class="popup-field">
+    <label>Variety <span style="color:var(--gray200)">(optional)</span></label>
+    <input type="text" id="lp-variety" placeholder="e.g. Hakuun, Queen of Night..." />
+    <div class="hint">Leave blank for "No variety"</div>
+  </div>
+  <div class="popup-actions">
+    <button class="pop-ok" onclick="applyLabel()">Apply</button>
+    <button class="pop-cancel" onclick="closeLabelPopup()">Cancel</button>
+  </div>
+</div>
+
+<!-- Variety-only popup -->
+<div id="variety-popup">
+  <h4>🌸 Set Variety</h4>
+  <input type="text" id="vp-variety" placeholder="e.g. Hakuun, Queen of Night..." />
+  <div class="popup-actions">
+    <button class="pop-ok" onclick="applyVariety()">Apply</button>
+    <button class="pop-cancel" onclick="closeVarietyPopup()">Cancel</button>
+  </div>
+</div>
+
+<!-- Drag select -->
+<div id="drag-select-box"></div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <img id="lb-img" src="" alt=""/>
+  <div class="lb-meta">
+    <div class="lb-date" id="lb-date"></div>
+    <div class="lb-info" id="lb-info"></div>
+  </div>
+  <div class="lb-nav">
+    <button onclick="lbNav(-1)">←</button>
+    <button onclick="lbNav(1)">→</button>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div id="confirm-dialog">
+  <div class="confirm-box">
+    <h3 id="confirm-title"></h3>
+    <p id="confirm-msg"></p>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-red" id="confirm-ok-btn" onclick="confirmOk()">Confirm</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
 <div id="spinner-overlay"><div class="spinner-box"><div class="spinner"></div><span id="spinner-msg">Working...</span></div></div>
 
 <script>
-  let allPhotos = [];
-  let currentView = 'all';
-  let selectMode = false;
-  let selectedIds = new Set();
+  const SE = {spring:'🌸',summer:'☀️',fall:'🍂',winter:'❄️'};
+  const SO = ['spring','summer','fall','winter'];
+  const YEARS = Array.from({length:12},(_,i)=>2026-i);
 
-  async function init() {
-    const res = await fetch('/api/me');
-    if (res.status === 401) { window.location.href = '/'; return; }
-    const user = await res.json();
-    window._userId = user.id;
-    document.getElementById('nav-username').textContent = user.username;
+  let allPhotos=[], currentView='all', selectedIds=new Set();
+  let openYears=new Set(), openPlants=new Set();
+  let lbIndex=0, confirmCallback=null, isTrashView=false;
 
-    // Check if season was requested via URL
-    const params = new URLSearchParams(window.location.search);
-    const season = params.get('season');
-
+  // ── Init ──────────────────────────────────────────────────────────────────
+  async function init(){
+    const res=await fetch('/api/me');
+    if(res.status===401){window.location.href='/';return;}
+    const user=await res.json();
+    window._userId=user.id;
+    document.getElementById('nav-username').textContent=user.username;
+    const params=new URLSearchParams(window.location.search);
     await loadSidebar();
-    if (season) {
-      const el = document.getElementById(`sb-${season}`);
-      loadView(`season:${season}`, el);
+    const year=params.get('year'),season=params.get('season');
+    if(year&&season){
+      openYears.add(parseInt(year));
+      await loadSidebar();
+      loadView(`year:${year}:${season}`,document.getElementById(`sb-${year}-${season}`));
     } else {
-      loadView('all', document.getElementById('sb-all'));
+      loadView('all',document.getElementById('sb-all'));
     }
+    setupDragSelect();
   }
 
   // ── Sidebar ───────────────────────────────────────────────────────────────
-  async function loadSidebar() {
-    const [labelData, photos] = await Promise.all([
-      fetch('/api/labels').then(r => r.json()),
-      fetch('/api/photos').then(r => r.json())
+  async function loadSidebar(){
+    const [labelData,plantTree,yearTree,trashed,allP]=await Promise.all([
+      fetch('/api/labels').then(r=>r.json()),
+      fetch('/api/plant-tree').then(r=>r.json()),
+      fetch('/api/year-tree').then(r=>r.json()),
+      fetch('/api/photos/trash').then(r=>r.json()),
+      fetch('/api/photos').then(r=>r.json())
     ]);
+    document.getElementById('sb-all-count').textContent=allP.length;
+    document.getElementById('sb-inbox-count').textContent=labelData.inbox_count;
+    document.getElementById('sb-trash-count').textContent=trashed.length;
 
-    document.getElementById('sb-all-count').textContent = photos.length;
-    document.getElementById('sb-inbox-count').textContent = labelData.inbox_count;
-
-    // label list
-    const list = document.getElementById('label-list');
-    list.innerHTML = labelData.labels.map(l => `
-      <div class="sb-item" id="sb-label-${l.label}" onclick="loadView('label:${l.label}', this)">
-        <span style="text-transform:capitalize">${l.label}</span>
+    // Label list (flat)
+    document.getElementById('label-list').innerHTML=labelData.labels.map(l=>`
+      <div class="sb-item" id="sb-label-${l.label}" onclick="loadView('label:${l.label}',this)">
+        <span style="text-transform:capitalize">🌱 ${l.label}</span>
         <span class="sb-count">${l.count}</span>
-      </div>
-    `).join('');
+      </div>`).join('');
 
-    // season counts from photos
-    const seasons = { spring:0, summer:0, fall:0, winter:0 };
-    photos.forEach(p => { if (p.season) seasons[p.season] = (seasons[p.season]||0) + 1; });
-    Object.entries(seasons).forEach(([s, c]) => {
-      const el = document.getElementById(`s-${s}`);
-      if (el) el.textContent = c;
-    });
+    renderPlantTree(plantTree);
+    renderYearTree(yearTree);
+  }
+
+  function renderPlantTree(tree){
+    const labels=Object.keys(tree).sort();
+    document.getElementById('plant-tree').innerHTML=labels.map(label=>{
+      const varieties=tree[label];
+      const total=Object.values(varieties).reduce((a,b)=>a+b,0);
+      const isOpen=openPlants.has(label);
+      // variety sub-rows
+      const varRows=Object.entries(varieties).sort((a,b)=>{
+        if(a[0]==='no-variety') return -1;
+        if(b[0]==='no-variety') return 1;
+        return a[0].localeCompare(b[0]);
+      }).map(([variety,count])=>`
+        <div class="variety-row" id="vr-${label}-${variety}"
+             onclick="loadView('plant:${label}:${variety}',this)">
+          <span class="vl">└ <span style="text-transform:capitalize">${variety==='no-variety'?'No variety':variety}</span></span>
+          <span class="sb-count">${count}</span>
+        </div>`).join('');
+      return `
+        <div>
+          <div class="tree-row ${isOpen?'open':''}" id="pt-row-${label}"
+               onclick="togglePlant('${label}')">
+            <span class="tl"><span class="chevron">▶</span><span style="text-transform:capitalize">🌿 ${label}</span></span>
+            <span class="tree-total">${total}</span>
+          </div>
+          <div class="sub-rows ${isOpen?'open':''}" id="pt-sub-${label}">${varRows}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function togglePlant(label){
+    const row=document.getElementById(`pt-row-${label}`);
+    const sub=document.getElementById(`pt-sub-${label}`);
+    if(sub.classList.contains('open')){openPlants.delete(label);row.classList.remove('open');sub.classList.remove('open');}
+    else{openPlants.add(label);row.classList.add('open');sub.classList.add('open');}
+  }
+
+  function renderYearTree(tree){
+    document.getElementById('year-tree').innerHTML=YEARS.map(year=>{
+      const seasons=tree[year]||{};
+      const total=Object.values(seasons).reduce((a,b)=>a+b,0);
+      const isOpen=openYears.has(year);
+      const sRows=SO.map(s=>`
+        <div class="sub-row" id="sb-${year}-${s}" onclick="loadView('year:${year}:${s}',this)">
+          <span class="sl">${SE[s]} <span style="text-transform:capitalize">${s}</span></span>
+          <span class="sb-count">${seasons[s]||0}</span>
+        </div>`).join('');
+      return `
+        <div>
+          <div class="tree-row ${isOpen?'open':''}" id="yr-row-${year}" onclick="toggleYear(${year})">
+            <span class="tl"><span class="chevron">▶</span><span>${year}</span></span>
+            <span class="tree-total">${total||0}</span>
+          </div>
+          <div class="sub-rows ${isOpen?'open':''}" id="yr-seasons-${year}">${sRows}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function toggleYear(year){
+    const row=document.getElementById(`yr-row-${year}`);
+    const secs=document.getElementById(`yr-seasons-${year}`);
+    if(secs.classList.contains('open')){openYears.delete(year);row.classList.remove('open');secs.classList.remove('open');}
+    else{openYears.add(year);row.classList.add('open');secs.classList.add('open');}
   }
 
   // ── Load view ─────────────────────────────────────────────────────────────
-  async function loadView(view, el) {
-    cancelSelect();
-    currentView = view;
-    document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
-    if (el) el.classList.add('active');
+  async function loadView(view,el){
+    clearSelection();
+    currentView=view;
+    isTrashView=(view==='trash');
+    document.querySelectorAll('.sb-item,.sub-row,.variety-row,.tree-row').forEach(i=>i.classList.remove('active'));
+    if(el) el.classList.add('active');
 
-    let photos = [];
-    let title = 'All photos';
-
-    if (view === 'all') {
-      photos = await fetch('/api/photos').then(r => r.json());
-      title = 'All photos';
-    } else if (view === 'inbox') {
-      photos = await fetch('/api/photos/label/inbox').then(r => r.json());
-      title = '📥 Inbox';
-    } else if (view.startsWith('label:')) {
-      const label = view.slice(6);
-      photos = await fetch(`/api/photos/label/${encodeURIComponent(label)}`).then(r => r.json());
-      title = label;
-    } else if (view.startsWith('season:')) {
-      const season = view.slice(7);
-      photos = await fetch(`/api/photos/season/${season}`).then(r => r.json());
-      title = `${seasonEmoji(season)} ${season.charAt(0).toUpperCase() + season.slice(1)}`;
+    let photos=[],title='';
+    if(view==='all'){photos=await fetch('/api/photos').then(r=>r.json());title='All photos';}
+    else if(view==='inbox'){photos=await fetch('/api/photos/label/inbox').then(r=>r.json());title='📥 Inbox';}
+    else if(view==='trash'){photos=await fetch('/api/photos/trash').then(r=>r.json());title='🗑 Trash';}
+    else if(view.startsWith('label:')){
+      const label=view.slice(6);
+      photos=await fetch(`/api/photos/label/${encodeURIComponent(label)}`).then(r=>r.json());
+      title=`🌱 ${label}`;
+    } else if(view.startsWith('plant:')){
+      const parts=view.split(':');
+      const label=parts[1],variety=parts[2];
+      photos=await fetch(`/api/photos/label/${encodeURIComponent(label)}/variety/${encodeURIComponent(variety)}`).then(r=>r.json());
+      title=`🌿 ${label}${variety!=='no-variety'?' › '+variety:''}`;
+    } else if(view.startsWith('year:')){
+      const parts=view.split(':');
+      const year=parts[1],season=parts[2];
+      if(season){
+        photos=await fetch(`/api/photos/year/${year}/season/${season}`).then(r=>r.json());
+        title=`${SE[season]} ${season.charAt(0).toUpperCase()+season.slice(1)} ${year}`;
+      } else {
+        photos=await fetch(`/api/photos/year/${year}`).then(r=>r.json());
+        title=`📅 ${year}`;
+      }
     }
 
-    allPhotos = photos;
-    document.getElementById('view-title').textContent = title;
-    document.getElementById('view-count').textContent =
-      `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
+    allPhotos=photos;
+    document.getElementById('view-title').textContent=title;
+    document.getElementById('view-count').textContent=`${photos.length} photo${photos.length!==1?'s':''}`;
+
+    const tbRight=document.getElementById('toolbar-right');
+    if(isTrashView){
+      tbRight.innerHTML=`
+        <button class="btn btn-ghost" onclick="restoreSelected()">↩ Restore</button>
+        <button class="btn btn-red" onclick="permanentDeleteSelected()">✕ Delete Forever</button>`;
+    } else { tbRight.innerHTML=''; }
 
     renderGrid(photos);
   }
 
   // ── Render grid ───────────────────────────────────────────────────────────
-  function renderGrid(photos) {
-    const wrap = document.getElementById('grid-wrap');
-    if (!photos.length) {
-      wrap.innerHTML = `<div class="empty-state"><div class="icon">🌱</div><p>No photos here yet</p></div>`;
+  function renderGrid(photos){
+    const wrap=document.getElementById('grid-wrap');
+    if(!photos.length){
+      wrap.innerHTML=`<div class="empty-state"><div class="icon">${isTrashView?'🗑':'🌱'}</div><p>${isTrashView?'Trash is empty':'No photos here yet'}</p></div>`;
       return;
     }
-
-    const gridClass = selectMode ? 'photo-grid select-mode' : 'photo-grid';
-    wrap.innerHTML = `<div class="${gridClass}" id="photo-grid">${photos.map(p => {
-      const src = `/uploads/user_${window._userId}/inbox/${p.stored_filename}`;
-      const selected = selectedIds.has(p.id) ? 'selected' : '';
-      const checked = selectedIds.has(p.id) ? 'checked' : '';
-      const seasonBadge = p.season
-        ? `<span class="season-badge badge-${p.season}">${seasonEmoji(p.season)} ${p.season}</span>` : '';
+    wrap.innerHTML=`<div class="photo-grid" id="photo-grid">${photos.map((p,i)=>{
+      const src=`/uploads/user_${window._userId}/inbox/${p.stored_filename}`;
+      const sel=selectedIds.has(p.id)?'selected':'';
+      const badge=p.season?`<span class="season-badge badge-${p.season}">${SE[p.season]} ${p.season} ${p.season_year||''}</span>`:'';
+      const variety=p.variety?`<div class="p-variety">↳ ${p.variety}</div>`:'';
       return `
-        <div class="photo-card ${selected}" data-id="${p.id}" onclick="cardClick(event, ${p.id})">
-          <div class="cb-wrap"><input type="checkbox" ${checked} onclick="cbClick(event, ${p.id})"></div>
-          <img src="${src}" loading="lazy" onerror="this.style.background='#EAF3DE';this.style.height='155px'">
+        <div class="photo-card ${sel}" data-id="${p.id}" data-index="${i}"
+             onmousedown="cardMD(event,${p.id})"
+             onclick="cardClick(event,${p.id})"
+             ondblclick="openLightbox(${i})"
+             oncontextmenu="showCtx(event,${p.id})">
+          <div class="sel-check">✓</div>
+          <img src="${src}" loading="lazy" onerror="this.style.background='#EAF3DE';this.style.height='160px'">
           <div class="info">
             <div class="p-date">${fmtDate(p.date_taken)}</div>
-            <div class="p-label">${p.label || 'unlabeled'}</div>
-            ${seasonBadge}
+            <div class="p-label">${p.label||'unlabeled'}</div>
+            ${variety}${badge}
           </div>
         </div>`;
     }).join('')}</div>`;
   }
 
-  // ── Select mode ───────────────────────────────────────────────────────────
-  function toggleSelectMode() {
-    selectMode = !selectMode;
-    const btn = document.getElementById('btn-select');
-    const cancel = document.getElementById('btn-cancel');
-    btn.classList.toggle('active', selectMode);
-    btn.style.display = selectMode ? 'none' : '';
-    cancel.style.display = selectMode ? '' : 'none';
-    document.getElementById('label-bar').classList.toggle('show', selectMode);
-    if (!selectMode) { selectedIds.clear(); }
-    renderGrid(allPhotos);
-    updateSelCount();
-  }
-
-  function cancelSelect() {
-    selectMode = false;
-    selectedIds.clear();
-    document.getElementById('btn-select').classList.remove('active');
-    document.getElementById('btn-select').style.display = '';
-    document.getElementById('btn-cancel').style.display = 'none';
-    document.getElementById('label-bar').classList.remove('show');
-    renderGrid(allPhotos);
-  }
-
-  function cardClick(e, id) {
-    if (!selectMode) return;
-    if (e.target.type === 'checkbox') return;
-    toggleSelect(id);
-  }
-
-  function cbClick(e, id) {
-    e.stopPropagation();
-    toggleSelect(id);
-  }
-
-  function toggleSelect(id) {
-    if (selectedIds.has(id)) selectedIds.delete(id);
-    else selectedIds.add(id);
-    const card = document.querySelector(`.photo-card[data-id="${id}"]`);
-    if (card) {
-      card.classList.toggle('selected', selectedIds.has(id));
-      const cb = card.querySelector('input[type=checkbox]');
-      if (cb) cb.checked = selectedIds.has(id);
-    }
-    updateSelCount();
-  }
-
-  function updateSelCount() {
-    document.getElementById('sel-count').textContent =
-      `${selectedIds.size} selected`;
-  }
-
-  // ── Apply label ───────────────────────────────────────────────────────────
-  async function applyLabel() {
-    const label = document.getElementById('label-input').value.trim();
-    if (!label) { showToast('Enter a label name', 'warn'); return; }
-    if (!selectedIds.size) { showToast('Select some photos first', 'warn'); return; }
-
-    const res = await fetch('/api/photos/label', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ photo_ids: Array.from(selectedIds), label })
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      showToast(`Label "${label}" applied to ${data.updated} photo${data.updated !== 1 ? 's' : ''}`);
-      document.getElementById('label-input').value = '';
-      cancelSelect();
-      await loadSidebar();
-      loadView(currentView, document.querySelector('.sb-item.active'));
+  // ── Selection ─────────────────────────────────────────────────────────────
+  function cardMD(e,id){e.stopPropagation();}
+  function cardClick(e,id){
+    if(e.ctrlKey||e.metaKey){toggleSel(id);}
+    else if(e.shiftKey&&selectedIds.size>0){
+      const ids=allPhotos.map(p=>p.id);
+      const last=Array.from(selectedIds).pop();
+      const a=ids.indexOf(last),b=ids.indexOf(id);
+      ids.slice(Math.min(a,b),Math.max(a,b)+1).forEach(i=>selectedIds.add(i));
+      renderGrid(allPhotos);updateSelBar();
     } else {
-      showToast(data.error || 'Failed to apply label', 'error');
+      if(selectedIds.has(id)&&selectedIds.size===1){clearSelection();}
+      else{selectedIds.clear();selectedIds.add(id);renderGrid(allPhotos);updateSelBar();}
     }
   }
+  function toggleSel(id){
+    if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);
+    const card=document.querySelector(`.photo-card[data-id="${id}"]`);
+    if(card)card.classList.toggle('selected',selectedIds.has(id));
+    updateSelBar();
+  }
+  function clearSelection(){selectedIds.clear();document.querySelectorAll('.photo-card.selected').forEach(c=>c.classList.remove('selected'));updateSelBar();}
+  function selectAll(){allPhotos.forEach(p=>selectedIds.add(p.id));renderGrid(allPhotos);updateSelBar();}
+  function updateSelBar(){
+    const bar=document.getElementById('sel-bar');
+    bar.classList.toggle('show',selectedIds.size>0);
+    document.getElementById('sel-count').textContent=`${selectedIds.size} selected`;
+  }
 
-  // Enter key on label input
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('label-input')?.addEventListener('keydown', e => {
-      if (e.key === 'Enter') applyLabel();
+  // ── Drag select ───────────────────────────────────────────────────────────
+  function setupDragSelect(){
+    const main=document.getElementById('main-area');
+    const box=document.getElementById('drag-select-box');
+    let dragging=false,startX=0,startY=0;
+    main.addEventListener('mousedown',e=>{
+      if(e.target.closest('.photo-card')||e.target.closest('.sel-bar')||e.target.closest('.toolbar')||e.button!==0)return;
+      dragging=true;startX=e.clientX;startY=e.clientY;
+      box.style.cssText=`display:block;left:${startX}px;top:${startY}px;width:0;height:0`;
+      if(!e.ctrlKey&&!e.metaKey)clearSelection();
     });
+    document.addEventListener('mousemove',e=>{
+      if(!dragging)return;
+      const x=Math.min(e.clientX,startX),y=Math.min(e.clientY,startY);
+      const w=Math.abs(e.clientX-startX),h=Math.abs(e.clientY-startY);
+      box.style.left=x+'px';box.style.top=y+'px';box.style.width=w+'px';box.style.height=h+'px';
+      const sr={left:x,right:x+w,top:y,bottom:y+h};
+      document.querySelectorAll('.photo-card').forEach(card=>{
+        const r=card.getBoundingClientRect();
+        const overlap=r.left<sr.right&&r.right>sr.left&&r.top<sr.bottom&&r.bottom>sr.top;
+        const id=parseInt(card.dataset.id);
+        if(overlap){selectedIds.add(id);card.classList.add('selected');}
+        else if(!e.ctrlKey){selectedIds.delete(id);card.classList.remove('selected');}
+      });
+      updateSelBar();
+    });
+    document.addEventListener('mouseup',()=>{if(!dragging)return;dragging=false;box.style.display='none';});
+  }
+
+  // ── Context menu ──────────────────────────────────────────────────────────
+  function showCtx(e,id){
+    e.preventDefault();e.stopPropagation();
+    closeCtx();
+    if(!selectedIds.has(id)){clearSelection();selectedIds.add(id);renderGrid(allPhotos);updateSelBar();}
+    const menu=document.getElementById('ctx-menu');
+    if(isTrashView){
+      menu.innerHTML=`
+        <div class="ctx-item" onclick="restoreSelected()"><span class="ctx-icon">↩</span> Restore</div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item danger" onclick="permanentDeleteSelected()"><span class="ctx-icon">✕</span> Delete Forever</div>`;
+    } else {
+      menu.innerHTML=`
+        <div class="ctx-item" onclick="closeCtx();showLabelPopup()"><span class="ctx-icon">🏷</span> Set Label</div>
+        <div class="ctx-item" onclick="closeCtx();showVarietyPopup()"><span class="ctx-icon">🌸</span> Set Variety</div>
+        <div class="ctx-item" onclick="closeCtx();downloadSelected()"><span class="ctx-icon">⬇</span> Download</div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item danger" onclick="closeCtx();trashSelected()"><span class="ctx-icon">🗑</span> Move to Trash</div>`;
+    }
+    menu.classList.add('show');
+    let x=e.clientX,y=e.clientY;
+    if(x+190>window.innerWidth)x=window.innerWidth-195;
+    if(y+160>window.innerHeight)y=window.innerHeight-165;
+    menu.style.left=x+'px';menu.style.top=y+'px';
+  }
+  function closeCtx(){document.getElementById('ctx-menu').classList.remove('show');}
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('#ctx-menu'))closeCtx();
+    if(!e.target.closest('#label-popup')&&!e.target.closest('#ctx-menu'))closeLabelPopup();
+    if(!e.target.closest('#variety-popup')&&!e.target.closest('#ctx-menu'))closeVarietyPopup();
+  });
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){closeCtx();closeLabelPopup();closeVarietyPopup();closeLightbox();}
+    if((e.key==='Delete'||e.key==='Backspace')&&selectedIds.size&&!isTrashView&&document.activeElement.tagName!=='INPUT'){trashSelected();}
   });
 
-  // ── Season organize ───────────────────────────────────────────────────────
-  async function runOrganize() {
-    document.getElementById('spinner-msg').textContent = 'Organizing by season...';
-    document.getElementById('spinner-overlay').classList.add('show');
-
-    const res = await fetch('/api/organize/seasons', { method: 'POST' });
-    const data = await res.json();
-    document.getElementById('spinner-overlay').classList.remove('show');
-
-    if (data.success) {
-      showToast(`✓ ${data.organized} photos organized${data.skipped ? ` · ${data.skipped} skipped (no date)` : ''}`, 'info');
-      await loadSidebar();
-      loadView(currentView, document.querySelector('.sb-item.active'));
-    } else {
-      showToast('Organize failed', 'error');
-    }
+  // ── Label popup ───────────────────────────────────────────────────────────
+  function showLabelPopup(){
+    if(!selectedIds.size){showToast('Select some photos first','warn');return;}
+    const popup=document.getElementById('label-popup');
+    document.getElementById('lp-label').value='';
+    document.getElementById('lp-variety').value='';
+    popup.classList.add('show');
+    popup.style.left=(window.innerWidth/2-140)+'px';
+    popup.style.top=(window.innerHeight/2-100)+'px';
+    setTimeout(()=>document.getElementById('lp-label').focus(),50);
   }
+  function closeLabelPopup(){document.getElementById('label-popup').classList.remove('show');}
+
+  async function applyLabel(){
+    const label=document.getElementById('lp-label').value.trim();
+    const variety=document.getElementById('lp-variety').value.trim();
+    if(!label){showToast('Plant name is required','warn');return;}
+    closeLabelPopup();
+    const res=await fetch('/api/photos/label',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({photo_ids:Array.from(selectedIds),label,variety})
+    });
+    const data=await res.json();
+    if(data.success){
+      showToast(`Labeled ${data.updated} photo${data.updated!==1?'s':''}${variety?` as "${label} › ${variety}"`:`as "${label}"`}`);
+      clearSelection();await loadSidebar();
+      loadView(currentView,document.querySelector('.sb-item.active,.sub-row.active,.variety-row.active'));
+    } else showToast(data.error||'Failed','error');
+  }
+
+  // enter key in label popup
+  document.addEventListener('DOMContentLoaded',()=>{
+    document.getElementById('lp-variety').addEventListener('keydown',e=>{if(e.key==='Enter')applyLabel();});
+    document.getElementById('lp-label').addEventListener('keydown',e=>{if(e.key==='Enter')applyLabel();});
+    document.getElementById('vp-variety').addEventListener('keydown',e=>{if(e.key==='Enter')applyVariety();});
+  });
+
+  // ── Variety-only popup ────────────────────────────────────────────────────
+  function showVarietyPopup(){
+    if(!selectedIds.size){showToast('Select some photos first','warn');return;}
+    const popup=document.getElementById('variety-popup');
+    document.getElementById('vp-variety').value='';
+    popup.classList.add('show');
+    popup.style.left=(window.innerWidth/2-130)+'px';
+    popup.style.top=(window.innerHeight/2-70)+'px';
+    setTimeout(()=>document.getElementById('vp-variety').focus(),50);
+  }
+  function closeVarietyPopup(){document.getElementById('variety-popup').classList.remove('show');}
+
+  async function applyVariety(){
+    const variety=document.getElementById('vp-variety').value.trim();
+    closeVarietyPopup();
+    const res=await fetch('/api/photos/variety',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({photo_ids:Array.from(selectedIds),variety})
+    });
+    const data=await res.json();
+    if(data.success){
+      showToast(`Variety "${variety||'cleared'}" set on ${data.updated} photo${data.updated!==1?'s':''}`);
+      clearSelection();await loadSidebar();
+      loadView(currentView,document.querySelector('.sb-item.active,.sub-row.active,.variety-row.active'));
+    } else showToast(data.error||'Failed','error');
+  }
+
+  // ── Download ──────────────────────────────────────────────────────────────
+  function downloadSelected(){
+    if(!selectedIds.size){showToast('Select photos first','warn');return;}
+    Array.from(selectedIds).forEach(id=>{
+      const photo=allPhotos.find(p=>p.id===id);
+      if(!photo)return;
+      const a=document.createElement('a');
+      a.href=`/uploads/user_${window._userId}/inbox/${photo.stored_filename}`;
+      a.download=photo.stored_filename;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    });
+  }
+
+  // ── Trash ─────────────────────────────────────────────────────────────────
+  function trashSelected(){
+    if(!selectedIds.size)return;
+    const count=selectedIds.size;
+    showConfirm('Move to Trash?',
+      `${count} photo${count>1?'s':''} will be moved to trash. You can restore them later.`,
+      'Move to Trash',async()=>{
+        const res=await fetch('/api/photos/trash',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:Array.from(selectedIds)})});
+        const data=await res.json();
+        if(data.success){showToast(`${data.trashed} photo${data.trashed!==1?'s':''} moved to trash`);clearSelection();await loadSidebar();loadView(currentView,document.querySelector('.sb-item.active,.sub-row.active,.variety-row.active'));}
+        else showToast('Failed to trash photos','error');
+      });
+  }
+
+  async function restoreSelected(){
+    if(!selectedIds.size){showToast('Select photos first','warn');return;}
+    const res=await fetch('/api/photos/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:Array.from(selectedIds)})});
+    const data=await res.json();
+    if(data.success){showToast(`${data.restored} photo${data.restored!==1?'s':''} restored`);clearSelection();await loadSidebar();loadView('trash',document.getElementById('sb-trash'));}
+    else showToast('Failed','error');
+  }
+
+  function permanentDeleteSelected(){
+    if(!selectedIds.size){showToast('Select photos first','warn');return;}
+    const count=selectedIds.size;
+    showConfirm('Delete Forever?',
+      `Permanently delete ${count} photo${count>1?'s':''}? This cannot be undone.`,
+      'Delete Forever',async()=>{
+        const res=await fetch('/api/photos/delete-permanent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:Array.from(selectedIds)})});
+        const data=await res.json();
+        if(data.success){showToast(`${data.deleted} photo${data.deleted!==1?'s':''} permanently deleted`);clearSelection();await loadSidebar();loadView('trash',document.getElementById('sb-trash'));}
+        else showToast('Failed','error');
+      });
+  }
+
+  // ── Organize ──────────────────────────────────────────────────────────────
+  async function runPlantOrganize(){
+    document.getElementById('spinner-msg').textContent='Organizing plant folders...';
+    document.getElementById('spinner-overlay').classList.add('show');
+    const res=await fetch('/api/organize/plants',{method:'POST'});
+    const data=await res.json();
+    document.getElementById('spinner-overlay').classList.remove('show');
+    if(data.success){showToast(`✓ ${data.organized} photos organized into plant folders${data.skipped?` · ${data.skipped} skipped (no label)`:''}`, 'info');await loadSidebar();}
+    else showToast('Organize failed','error');
+  }
+
+  async function runSeasonOrganize(){
+    document.getElementById('spinner-msg').textContent='Organizing by year & season...';
+    document.getElementById('spinner-overlay').classList.add('show');
+    const res=await fetch('/api/organize/seasons',{method:'POST'});
+    const data=await res.json();
+    document.getElementById('spinner-overlay').classList.remove('show');
+    if(data.success){showToast(`✓ ${data.organized} photos organized${data.skipped?` · ${data.skipped} skipped`:''}`,'info');await loadSidebar();}
+    else showToast('Organize failed','error');
+  }
+
+  // ── Lightbox ──────────────────────────────────────────────────────────────
+  function openLightbox(i){lbIndex=i;showLbPhoto();document.getElementById('lightbox').classList.add('show');}
+  function closeLightbox(){document.getElementById('lightbox').classList.remove('show');}
+  function lbNav(dir){lbIndex=(lbIndex+dir+allPhotos.length)%allPhotos.length;showLbPhoto();}
+  function showLbPhoto(){
+    const p=allPhotos[lbIndex];
+    document.getElementById('lb-img').src=`/uploads/user_${window._userId}/inbox/${p.stored_filename}`;
+    document.getElementById('lb-date').textContent=fmtDate(p.date_taken);
+    const parts=[p.label,p.variety,p.season?`${SE[p.season]} ${p.season} ${p.season_year||''}`:null].filter(Boolean);
+    document.getElementById('lb-info').textContent=parts.join(' · ')||'unlabeled';
+  }
+  document.getElementById('lightbox').addEventListener('click',function(e){if(e.target===this)closeLightbox();});
+
+  // ── Confirm dialog ────────────────────────────────────────────────────────
+  function showConfirm(title,msg,okLabel,cb){
+    confirmCallback=cb;
+    document.getElementById('confirm-title').textContent=title;
+    document.getElementById('confirm-msg').textContent=msg;
+    document.getElementById('confirm-ok-btn').textContent=okLabel;
+    document.getElementById('confirm-dialog').classList.add('show');
+  }
+  function closeConfirm(){document.getElementById('confirm-dialog').classList.remove('show');confirmCallback=null;}
+  async function confirmOk(){closeConfirm();if(confirmCallback)await confirmCallback();}
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  function seasonEmoji(s) {
-    return { spring:'🌸', summer:'☀️', fall:'🍂', winter:'❄️' }[s] || '';
-  }
-  function fmtDate(d) {
-    if (!d) return 'Unknown date';
-    return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  }
-  function showToast(msg, type='success') {
-    const t = document.getElementById('toast');
-    t.textContent = msg; t.className = `show toast-${type}`;
-    clearTimeout(t._timer); t._timer = setTimeout(() => t.className='', 4000);
-  }
-  function doLogout() { fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/'); }
+  function fmtDate(d){if(!d)return 'Unknown date';return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+  function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`show toast-${type}`;clearTimeout(t._timer);t._timer=setTimeout(()=>t.className='',4000);}
+  function doLogout(){fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/');}
 
   init();
 </script>

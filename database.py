@@ -32,8 +32,13 @@ def init_db():
             date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             exif_found BOOLEAN DEFAULT 0,
             label TEXT DEFAULT NULL,
+            variety TEXT DEFAULT NULL,
             season TEXT DEFAULT NULL,
+            season_year INTEGER DEFAULT NULL,
             season_copy_path TEXT DEFAULT NULL,
+            plant_copy_path TEXT DEFAULT NULL,
+            trashed BOOLEAN DEFAULT 0,
+            trashed_at TIMESTAMP DEFAULT NULL,
             notes TEXT,
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
@@ -105,7 +110,7 @@ def get_all_photos(user_id: int):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT * FROM photos WHERE user_id = ?
+        SELECT * FROM photos WHERE user_id = ? AND trashed = 0
         ORDER BY date_taken DESC
     """, (user_id,))
     rows = [dict(r) for r in cursor.fetchall()]
@@ -118,12 +123,13 @@ def get_photos_by_label(user_id: int, label: str):
     cursor = conn.cursor()
     if label == "inbox":
         cursor.execute("""
-            SELECT * FROM photos WHERE user_id = ? AND (label IS NULL OR label = '')
+            SELECT * FROM photos WHERE user_id = ? AND trashed = 0
+            AND (label IS NULL OR label = '')
             ORDER BY date_taken DESC
         """, (user_id,))
     else:
         cursor.execute("""
-            SELECT * FROM photos WHERE user_id = ? AND label = ?
+            SELECT * FROM photos WHERE user_id = ? AND trashed = 0 AND label = ?
             ORDER BY date_taken DESC
         """, (user_id, label))
     rows = [dict(r) for r in cursor.fetchall()]
@@ -131,13 +137,48 @@ def get_photos_by_label(user_id: int, label: str):
     return rows
 
 
-def get_photos_by_season(user_id: int, season: str):
+def get_photos_by_label_variety(user_id: int, label: str, variety: str):
+    """Get photos by label + variety. variety='no-variety' means variety IS NULL."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    if variety == "no-variety":
+        cursor.execute("""
+            SELECT * FROM photos WHERE user_id = ? AND trashed = 0
+            AND label = ? AND (variety IS NULL OR variety = '')
+            ORDER BY date_taken DESC
+        """, (user_id, label))
+    else:
+        cursor.execute("""
+            SELECT * FROM photos WHERE user_id = ? AND trashed = 0
+            AND label = ? AND variety = ?
+            ORDER BY date_taken DESC
+        """, (user_id, label, variety))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_photos_by_year_season(user_id: int, year: int, season: str):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT * FROM photos WHERE user_id = ? AND season = ?
+        SELECT * FROM photos
+        WHERE user_id = ? AND trashed = 0 AND season_year = ? AND season = ?
         ORDER BY date_taken DESC
-    """, (user_id, season))
+    """, (user_id, year, season))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_photos_by_year(user_id: int, year: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM photos
+        WHERE user_id = ? AND trashed = 0 AND season_year = ?
+        ORDER BY date_taken DESC
+    """, (user_id, year))
     rows = [dict(r) for r in cursor.fetchall()]
     conn.close()
     return rows
@@ -148,18 +189,66 @@ def get_all_labels(user_id: int):
     cursor = conn.cursor()
     cursor.execute("""
         SELECT label, COUNT(*) as count FROM photos
-        WHERE user_id = ? AND label IS NOT NULL AND label != ''
+        WHERE user_id = ? AND trashed = 0 AND label IS NOT NULL AND label != ''
         GROUP BY label ORDER BY label
     """, (user_id,))
-    rows = [dict(r) for r in cursor.fetchall()]
-    # also count inbox
+    labels = [dict(r) for r in cursor.fetchall()]
     cursor.execute("""
         SELECT COUNT(*) as count FROM photos
-        WHERE user_id = ? AND (label IS NULL OR label = '')
+        WHERE user_id = ? AND trashed = 0 AND (label IS NULL OR label = '')
     """, (user_id,))
     inbox_count = cursor.fetchone()["count"]
     conn.close()
-    return {"labels": rows, "inbox_count": inbox_count}
+    return {"labels": labels, "inbox_count": inbox_count}
+
+
+def get_plant_tree(user_id: int):
+    """Returns {label: {variety_or_no-variety: count}}"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT label,
+               COALESCE(NULLIF(variety,''), 'no-variety') as var,
+               COUNT(*) as count
+        FROM photos
+        WHERE user_id = ? AND trashed = 0
+          AND label IS NOT NULL AND label != ''
+        GROUP BY label, var
+        ORDER BY label, var
+    """, (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    tree = {}
+    for row in rows:
+        lb = row["label"]
+        var = row["var"]
+        if lb not in tree:
+            tree[lb] = {}
+        tree[lb][var] = row["count"]
+    return tree
+
+
+def get_year_season_tree(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT season_year, season, COUNT(*) as count
+        FROM photos
+        WHERE user_id = ? AND trashed = 0
+          AND season IS NOT NULL AND season_year IS NOT NULL
+        GROUP BY season_year, season
+        ORDER BY season_year DESC, season
+    """, (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    tree = {}
+    for row in rows:
+        y = row["season_year"]
+        s = row["season"]
+        if y not in tree:
+            tree[y] = {}
+        tree[y][s] = row["count"]
+    return tree
 
 
 def set_labels(photo_ids: list, label: str, user_id: int):
@@ -176,13 +265,39 @@ def set_labels(photo_ids: list, label: str, user_id: int):
     return affected
 
 
-def set_season(photo_id: int, season: str, season_copy_path: str, user_id: int):
+def set_variety(photo_ids: list, variety: str, user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholders = ",".join("?" * len(photo_ids))
+    cursor.execute(f"""
+        UPDATE photos SET variety = ?
+        WHERE id IN ({placeholders}) AND user_id = ?
+    """, [variety] + photo_ids + [user_id])
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+    return affected
+
+
+def set_season(photo_id: int, season: str, season_year: int,
+               season_copy_path: str, user_id: int):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        UPDATE photos SET season = ?, season_copy_path = ?
+        UPDATE photos SET season = ?, season_year = ?, season_copy_path = ?
         WHERE id = ? AND user_id = ?
-    """, (season, season_copy_path, photo_id, user_id))
+    """, (season, season_year, season_copy_path, photo_id, user_id))
+    conn.commit()
+    conn.close()
+
+
+def set_plant_copy_path(photo_id: int, plant_copy_path: str, user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE photos SET plant_copy_path = ?
+        WHERE id = ? AND user_id = ?
+    """, (plant_copy_path, photo_id, user_id))
     conn.commit()
     conn.close()
 
@@ -190,32 +305,92 @@ def set_season(photo_id: int, season: str, season_copy_path: str, user_id: int):
 def get_stats(user_id: int):
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) as total FROM photos WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT COUNT(*) as total FROM photos WHERE user_id = ? AND trashed = 0", (user_id,))
     total = cursor.fetchone()["total"]
     cursor.execute("""
         SELECT COUNT(DISTINCT label) as count FROM photos
-        WHERE user_id = ? AND label IS NOT NULL AND label != ''
+        WHERE user_id = ? AND trashed = 0 AND label IS NOT NULL AND label != ''
     """, (user_id,))
     label_count = cursor.fetchone()["count"]
     cursor.execute("""
         SELECT COUNT(*) as count FROM photos
-        WHERE user_id = ? AND (label IS NULL OR label = '')
+        WHERE user_id = ? AND trashed = 0 AND (label IS NULL OR label = '')
     """, (user_id,))
     inbox_count = cursor.fetchone()["count"]
     cursor.execute("""
-        SELECT season, COUNT(*) as count FROM photos
-        WHERE user_id = ? AND season IS NOT NULL
-        GROUP BY season
+        SELECT COUNT(*) as count FROM photos
+        WHERE user_id = ? AND trashed = 0 AND season IS NOT NULL
     """, (user_id,))
-    seasons = {r["season"]: r["count"] for r in cursor.fetchall()}
-    cursor.execute("""
-        SELECT date_added FROM photos WHERE user_id = ?
-        ORDER BY date_added DESC LIMIT 5
-    """, (user_id,))
-    recent = [dict(r) for r in cursor.fetchall()]
+    organized_count = cursor.fetchone()["count"]
+    tree = get_year_season_tree(user_id)
     conn.close()
-    return {"total": total, "label_count": label_count,
-            "inbox_count": inbox_count, "seasons": seasons, "recent": recent}
+    return {
+        "total": total,
+        "label_count": label_count,
+        "inbox_count": inbox_count,
+        "organized_count": organized_count,
+        "year_tree": tree
+    }
+
+
+# ── Trash ─────────────────────────────────────────────────────────────────────
+
+def trash_photos(photo_ids: list, user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholders = ",".join("?" * len(photo_ids))
+    cursor.execute(f"""
+        UPDATE photos SET trashed = 1, trashed_at = CURRENT_TIMESTAMP
+        WHERE id IN ({placeholders}) AND user_id = ?
+    """, photo_ids + [user_id])
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+    return affected
+
+
+def restore_photos(photo_ids: list, user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholders = ",".join("?" * len(photo_ids))
+    cursor.execute(f"""
+        UPDATE photos SET trashed = 0, trashed_at = NULL
+        WHERE id IN ({placeholders}) AND user_id = ?
+    """, photo_ids + [user_id])
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+    return affected
+
+
+def permanently_delete_photos(photo_ids: list, user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    placeholders = ",".join("?" * len(photo_ids))
+    cursor.execute(f"""
+        SELECT file_path, season_copy_path, plant_copy_path FROM photos
+        WHERE id IN ({placeholders}) AND user_id = ?
+    """, photo_ids + [user_id])
+    paths = [(r["file_path"], r["season_copy_path"], r["plant_copy_path"])
+             for r in cursor.fetchall()]
+    cursor.execute(f"""
+        DELETE FROM photos WHERE id IN ({placeholders}) AND user_id = ?
+    """, photo_ids + [user_id])
+    conn.commit()
+    conn.close()
+    return paths
+
+
+def get_trashed_photos(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM photos WHERE user_id = ? AND trashed = 1
+        ORDER BY trashed_at DESC
+    """, (user_id,))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
 
 
 def log_action(photo_id: int, action: str, detail: str = ""):

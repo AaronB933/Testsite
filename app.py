@@ -4,8 +4,12 @@ from datetime import date, datetime
 from flask import Flask, request, jsonify, send_from_directory, session
 
 from database import (init_db, create_user, verify_user, insert_photo, log_action,
-                      get_all_photos, get_photos_by_label, get_photos_by_season,
-                      get_all_labels, set_labels, set_season, get_stats)
+                      get_all_photos, get_photos_by_label, get_photos_by_label_variety,
+                      get_photos_by_year_season, get_photos_by_year,
+                      get_all_labels, get_plant_tree, get_year_season_tree,
+                      set_labels, set_variety, set_season, set_plant_copy_path,
+                      get_stats, trash_photos, restore_photos,
+                      permanently_delete_photos, get_trashed_photos)
 from exifutils import (read_date_taken, write_date_to_exif, build_stored_filename,
                        get_existing_filenames, is_supported)
 
@@ -13,24 +17,17 @@ app = Flask(__name__, static_folder="static", template_folder="static")
 app.secret_key = os.environ.get("SECRET_KEY", "plant-archive-secret-change-me")
 
 UPLOAD_BASE = os.path.join(os.path.dirname(__file__), "uploads")
-VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.m4v', '.wmv', '.flv', '.webm', '.3gp'}
-
-SEASON_RANGES = [
-    ("winter",  (11, 1),  (12, 31)),
-    ("winter",  (1,  1),  (3,   7)),
-    ("spring",  (3,  8),  (6,   1)),
-    ("summer",  (6,  2),  (8,  15)),
-    ("fall",    (8, 16),  (11,  1)),
-]
+VIDEO_EXTENSIONS = {'.mp4','.mov','.avi','.mkv','.m4v','.wmv','.flv','.webm','.3gp'}
 
 
 def get_season(d: date) -> str:
-    md = (d.month, d.day)
-    if (11, 1) <= md <= (12, 31): return "winter"
-    if (1,  1) <= md <= (3,   7): return "winter"
-    if (3,  8) <= md <= (6,   1): return "spring"
-    if (6,  2) <= md <= (8,  15): return "summer"
-    if (8, 16) <= md <= (11,  1): return "fall"
+    m, day = d.month, d.day
+    if (m == 3 and day >= 8) or m == 4 or m == 5 or (m == 6 and day <= 1):
+        return "spring"
+    if (m == 6 and day >= 2) or m == 7 or (m == 8 and day <= 15):
+        return "summer"
+    if (m == 8 and day >= 16) or m == 9 or m == 10 or (m == 11 and day <= 1):
+        return "fall"
     return "winter"
 
 
@@ -48,8 +45,13 @@ def login_required(fn):
     return wrapper
 
 
-def user_upload_dir(user_id: int) -> str:
+def user_dir(user_id: int) -> str:
     return os.path.join(UPLOAD_BASE, f"user_{user_id}")
+
+
+def safe_folder_name(name: str) -> str:
+    """Convert a label/variety to a safe folder name."""
+    return name.strip().lower().replace(" ", "_").replace("/", "-")
 
 
 # ── Pages ──────────────────────────────────────────────────────────────────────
@@ -146,9 +148,9 @@ def upload_photo():
         return jsonify({"error": "video"}), 415
 
     if not is_supported(original_filename):
-        return jsonify({"error": f"Unsupported file type"}), 400
+        return jsonify({"error": "Unsupported file type"}), 400
 
-    inbox_dir = os.path.join(user_upload_dir(user["id"]), "inbox")
+    inbox_dir = os.path.join(user_dir(user["id"]), "inbox")
     os.makedirs(inbox_dir, exist_ok=True)
 
     temp_path = os.path.join(inbox_dir, f"_temp_{original_filename}")
@@ -175,15 +177,15 @@ def upload_photo():
     shutil.move(temp_path, final_path)
     write_date_to_exif(final_path, date_taken)
 
+    dt = date_taken.date() if hasattr(date_taken, 'date') else date_taken
     photo_id = insert_photo(
         user_id=user["id"],
         original_filename=original_filename,
         stored_filename=stored_filename,
         file_path=final_path,
-        date_taken=date_taken.date() if hasattr(date_taken, 'date') else date_taken,
+        date_taken=dt,
         exif_found=exif_found
     )
-
     log_action(photo_id, "uploaded", original_filename)
 
     return jsonify({
@@ -206,30 +208,68 @@ def all_photos():
 def photos_by_label(label):
     return jsonify(get_photos_by_label(current_user()["id"], label))
 
-@app.route("/api/photos/season/<season>")
+@app.route("/api/photos/label/<path:label>/variety/<path:variety>")
 @login_required
-def photos_by_season(season):
-    return jsonify(get_photos_by_season(current_user()["id"], season))
+def photos_by_label_variety(label, variety):
+    return jsonify(get_photos_by_label_variety(current_user()["id"], label, variety))
+
+@app.route("/api/photos/year/<int:year>")
+@login_required
+def photos_by_year(year):
+    return jsonify(get_photos_by_year(current_user()["id"], year))
+
+@app.route("/api/photos/year/<int:year>/season/<season>")
+@login_required
+def photos_by_year_season(year, season):
+    return jsonify(get_photos_by_year_season(current_user()["id"], year, season))
 
 @app.route("/api/labels")
 @login_required
 def labels():
     return jsonify(get_all_labels(current_user()["id"]))
 
+@app.route("/api/plant-tree")
+@login_required
+def plant_tree():
+    return jsonify(get_plant_tree(current_user()["id"]))
 
-# ── Label assignment ────────────────────────────────────────────────────────────
+@app.route("/api/year-tree")
+@login_required
+def year_tree():
+    return jsonify(get_year_season_tree(current_user()["id"]))
+
+
+# ── Label & variety assignment ─────────────────────────────────────────────────
 
 @app.route("/api/photos/label", methods=["POST"])
 @login_required
 def assign_label():
     data = request.get_json()
     photo_ids = data.get("photo_ids", [])
-    label = (data.get("label") or "").strip()
+    label = (data.get("label") or "").strip().lower()
+    variety = (data.get("variety") or "").strip().lower()
     if not photo_ids:
         return jsonify({"error": "No photos selected"}), 400
     if not label:
         return jsonify({"error": "No label provided"}), 400
+
     affected = set_labels(photo_ids, label, current_user()["id"])
+    if variety:
+        set_variety(photo_ids, variety, current_user()["id"])
+
+    return jsonify({"success": True, "updated": affected})
+
+
+@app.route("/api/photos/variety", methods=["POST"])
+@login_required
+def assign_variety():
+    data = request.get_json()
+    photo_ids = data.get("photo_ids", [])
+    variety = (data.get("variety") or "").strip().lower()
+    if not photo_ids:
+        return jsonify({"error": "No photos selected"}), 400
+
+    affected = set_variety(photo_ids, variety if variety else None, current_user()["id"])
     return jsonify({"success": True, "updated": affected})
 
 
@@ -240,18 +280,18 @@ def assign_label():
 def organize_seasons():
     user = current_user()
     photos = get_all_photos(user["id"])
-    organized = 0
-    skipped = 0
+    organized = skipped = 0
 
     for photo in photos:
         if not photo["date_taken"]:
             skipped += 1
             continue
 
-        d = date.fromisoformat(photo["date_taken"])
+        d = date.fromisoformat(str(photo["date_taken"]))
         season = get_season(d)
+        year = d.year
 
-        season_dir = os.path.join(user_upload_dir(user["id"]), f"season_{season}")
+        season_dir = os.path.join(user_dir(user["id"]), str(year), season)
         os.makedirs(season_dir, exist_ok=True)
 
         src = photo["file_path"]
@@ -259,22 +299,167 @@ def organize_seasons():
             skipped += 1
             continue
 
-        dest_filename = photo["stored_filename"]
-        dest_path = os.path.join(season_dir, dest_filename)
-
-        # avoid overwriting if already there
+        dest_path = os.path.join(season_dir, photo["stored_filename"])
         counter = 2
-        base, ext = os.path.splitext(dest_filename)
+        base, ext = os.path.splitext(photo["stored_filename"])
         while os.path.exists(dest_path):
             dest_path = os.path.join(season_dir, f"{base}_{counter}{ext}")
             counter += 1
 
         shutil.copy2(src, dest_path)
-        set_season(photo["id"], season, dest_path, user["id"])
-        log_action(photo["id"], "season_copy", f"Copied to {season}")
+        set_season(photo["id"], season, year, dest_path, user["id"])
+        log_action(photo["id"], "season_copy", f"Copied to {year}/{season}")
         organized += 1
 
     return jsonify({"success": True, "organized": organized, "skipped": skipped})
+
+
+# ── Plant directory organize ────────────────────────────────────────────────────
+
+@app.route("/api/organize/plants", methods=["POST"])
+@login_required
+def organize_plants():
+    user = current_user()
+    photos = get_all_photos(user["id"])
+    organized = skipped = 0
+
+    for photo in photos:
+        if not photo["label"]:
+            skipped += 1
+            continue
+
+        label_folder = safe_folder_name(photo["label"])
+        variety = photo.get("variety") or ""
+        variety_folder = safe_folder_name(variety) if variety else "no-variety"
+
+        plant_dir = os.path.join(user_dir(user["id"]), "plants",
+                                 label_folder, variety_folder)
+        os.makedirs(plant_dir, exist_ok=True)
+
+        src = photo["file_path"]
+        if not os.path.exists(src):
+            skipped += 1
+            continue
+
+        dest_path = os.path.join(plant_dir, photo["stored_filename"])
+        counter = 2
+        base, ext = os.path.splitext(photo["stored_filename"])
+        while os.path.exists(dest_path):
+            dest_path = os.path.join(plant_dir, f"{base}_{counter}{ext}")
+            counter += 1
+
+        shutil.copy2(src, dest_path)
+        set_plant_copy_path(photo["id"], dest_path, user["id"])
+        log_action(photo["id"], "plant_copy",
+                   f"Copied to plants/{label_folder}/{variety_folder}")
+        organized += 1
+
+    return jsonify({"success": True, "organized": organized, "skipped": skipped})
+
+
+# ── Trash ──────────────────────────────────────────────────────────────────────
+
+@app.route("/api/photos/trash", methods=["POST"])
+@login_required
+def move_to_trash():
+    data = request.get_json()
+    photo_ids = data.get("photo_ids", [])
+    if not photo_ids:
+        return jsonify({"error": "No photos provided"}), 400
+    user = current_user()
+
+    conn_mod = __import__('database').get_connection()
+    cursor = conn_mod.cursor()
+    ph = ",".join("?"*len(photo_ids))
+    cursor.execute(f"SELECT * FROM photos WHERE id IN ({ph}) AND user_id = ?",
+                   photo_ids + [user["id"]])
+    photos = [dict(r) for r in cursor.fetchall()]
+    conn_mod.close()
+
+    trash_dir = os.path.join(user_dir(user["id"]), "trash")
+    os.makedirs(trash_dir, exist_ok=True)
+
+    for photo in photos:
+        src = photo["file_path"]
+        if os.path.exists(src):
+            dest = os.path.join(trash_dir, photo["stored_filename"])
+            counter = 2
+            base, ext = os.path.splitext(photo["stored_filename"])
+            while os.path.exists(dest):
+                dest = os.path.join(trash_dir, f"{base}_{counter}{ext}")
+                counter += 1
+            shutil.move(src, dest)
+
+    affected = trash_photos(photo_ids, user["id"])
+    return jsonify({"success": True, "trashed": affected})
+
+
+@app.route("/api/photos/restore", methods=["POST"])
+@login_required
+def restore_from_trash():
+    data = request.get_json()
+    photo_ids = data.get("photo_ids", [])
+    if not photo_ids:
+        return jsonify({"error": "No photos provided"}), 400
+    user = current_user()
+
+    conn_mod = __import__('database').get_connection()
+    cursor = conn_mod.cursor()
+    ph = ",".join("?"*len(photo_ids))
+    cursor.execute(f"SELECT * FROM photos WHERE id IN ({ph}) AND user_id = ?",
+                   photo_ids + [user["id"]])
+    photos = [dict(r) for r in cursor.fetchall()]
+    conn_mod.close()
+
+    inbox_dir = os.path.join(user_dir(user["id"]), "inbox")
+    trash_dir = os.path.join(user_dir(user["id"]), "trash")
+    os.makedirs(inbox_dir, exist_ok=True)
+
+    for photo in photos:
+        trash_path = os.path.join(trash_dir, photo["stored_filename"])
+        if os.path.exists(trash_path):
+            shutil.move(trash_path, os.path.join(inbox_dir, photo["stored_filename"]))
+
+    affected = restore_photos(photo_ids, user["id"])
+    return jsonify({"success": True, "restored": affected})
+
+
+@app.route("/api/photos/delete-permanent", methods=["POST"])
+@login_required
+def delete_permanent():
+    data = request.get_json()
+    photo_ids = data.get("photo_ids", [])
+    if not photo_ids:
+        return jsonify({"error": "No photos provided"}), 400
+    paths = permanently_delete_photos(photo_ids, current_user()["id"])
+    for file_path, season_path, plant_path in paths:
+        for p in [file_path, season_path, plant_path]:
+            if p and os.path.exists(p):
+                try: os.remove(p)
+                except: pass
+    return jsonify({"success": True, "deleted": len(paths)})
+
+
+@app.route("/api/photos/trash", methods=["GET"])
+@login_required
+def list_trash():
+    return jsonify(get_trashed_photos(current_user()["id"]))
+
+@app.route("/api/open-folder/<folder_type>")
+@login_required
+def open_folder(folder_type):
+    user = current_user()
+    base = user_dir(user["id"])
+    if folder_type == "plants":
+        path = os.path.join(base, "plants")
+    elif folder_type == "seasons":
+        path = os.path.join(base)  # year folders live directly here
+    else:
+        return jsonify({"error": "Unknown folder"}), 400
+
+    os.makedirs(path, exist_ok=True)
+    os.startfile(path)
+    return jsonify({"success": True})
 
 
 # ── Serve files ─────────────────────────────────────────────────────────────────
