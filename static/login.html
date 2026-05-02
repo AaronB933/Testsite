@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plant Archive — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #f7f5f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+ 
+    .card {
+      background: white;
+      border-radius: 20px;
+      border: 1px solid #D3D1C7;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 380px;
+    }
+ 
+    .logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+ 
+    .logo .leaf { font-size: 2rem; display: block; margin-bottom: 0.5rem; }
+ 
+    .logo h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.6rem;
+      font-weight: 400;
+      color: #173404;
+    }
+ 
+    .logo p {
+      font-size: 0.82rem;
+      color: #B4B2A9;
+      margin-top: 0.25rem;
+    }
+ 
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: #F1EFE8;
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 1.75rem;
+    }
+ 
+    .tab {
+      flex: 1;
+      padding: 0.5rem;
+      text-align: center;
+      border-radius: 7px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: #888780;
+      border: none;
+      background: none;
+      font-family: inherit;
+    }
+ 
+    .tab.active {
+      background: white;
+      color: #173404;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+ 
+    /* Form */
+    .field {
+      margin-bottom: 1rem;
+    }
+ 
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #5F5E5A;
+      margin-bottom: 0.4rem;
+    }
+ 
+    .field input {
+      width: 100%;
+      padding: 0.65rem 0.9rem;
+      border: 1.5px solid #D3D1C7;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      color: #444441;
+      background: #fafaf8;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+ 
+    .field input:focus {
+      border-color: #3B6D11;
+      background: white;
+    }
+ 
+    .submit-btn {
+      width: 100%;
+      padding: 0.8rem;
+      background: #173404;
+      color: #EAF3DE;
+      border: none;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.15s;
+    }
+ 
+    .submit-btn:hover { background: #27500A; }
+    .submit-btn:active { background: #0F6E56; }
+ 
+    .error-msg {
+      display: none;
+      background: #FCEBEB;
+      border: 1px solid #F09595;
+      color: #A32D2D;
+      border-radius: 8px;
+      padding: 0.6rem 0.85rem;
+      font-size: 0.82rem;
+      margin-bottom: 1rem;
+    }
+ 
+    .error-msg.show { display: block; }
+ 
+    .divider {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #B4B2A9;
+      margin: 1.25rem 0 0;
+    }
+  </style>
+</head>
+<body>
+ 
+<div class="card">
+  <div class="logo">
+    <span class="leaf">🌿</span>
+    <h1>Plant Archive</h1>
+    <p>Your personal plant photo journal</p>
+  </div>
+ 
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('login', this)">Sign in</button>
+    <button class="tab" onclick="switchTab('register', this)">Create account</button>
+  </div>
+ 
+  <div id="error-msg" class="error-msg"></div>
+ 
+  <!-- Login form -->
+  <div id="login-form">
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="login-username" placeholder="Your username" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Your password" autocomplete="current-password" />
+    </div>
+    <button class="submit-btn" onclick="doLogin()">Sign in</button>
+  </div>
+ 
+  <!-- Register form -->
+  <div id="register-form" style="display:none">
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="reg-username" placeholder="Choose a username" autocomplete="username" />
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="reg-password" placeholder="At least 6 characters" autocomplete="new-password" />
+    </div>
+    <div class="field">
+      <label>Confirm password</label>
+      <input type="password" id="reg-confirm" placeholder="Repeat password" autocomplete="new-password" />
+    </div>
+    <button class="submit-btn" onclick="doRegister()">Create account</button>
+  </div>
+ 
+  <p class="divider">Plant Archive &mdash; local network only</p>
+</div>
+ 
+<script>
+  function switchTab(tab, el) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('login-form').style.display = tab === 'login' ? 'block' : 'none';
+    document.getElementById('register-form').style.display = tab === 'register' ? 'block' : 'none';
+    hideError();
+  }
+ 
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+ 
+  function hideError() {
+    document.getElementById('error-msg').classList.remove('show');
+  }
+ 
+  async function doLogin() {
+    hideError();
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+ 
+    if (!username || !password) { showError('Please fill in all fields'); return; }
+ 
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+ 
+    const data = await res.json();
+    if (data.success) {
+      window.location.href = '/';
+    } else {
+      showError(data.error || 'Login failed');
+    }
+  }
+ 
+  async function doRegister() {
+    hideError();
+    const username = document.getElementById('reg-username').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirm = document.getElementById('reg-confirm').value;
+ 
+    if (!username || !password) { showError('Please fill in all fields'); return; }
+    if (password !== confirm) { showError('Passwords do not match'); return; }
+ 
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+ 
+    const data = await res.json();
+    if (data.success) {
+      window.location.href = '/';
+    } else {
+      showError(data.error || 'Registration failed');
+    }
+  }
+ 
+  // Allow Enter key to submit
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const loginVisible = document.getElementById('login-form').style.display !== 'none';
+      loginVisible ? doLogin() : doRegister();
+    }
+  });
+</script>
+</body>
+</html>
+ 
