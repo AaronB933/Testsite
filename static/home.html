@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plant Archive — Home</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    /* paste base styles inline since we're not using a server-side template engine */
+  </style>
+</head>
+<body>
+<!-- Nav injected by base -->
+<div id="nav-mount"></div>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green-50:#EAF3DE;--green-100:#C0DD97;--green-200:#97C459;
+    --green-600:#3B6D11;--green-800:#27500A;--green-900:#173404;
+    --amber-50:#FAEEDA;--amber-400:#BA7517;
+    --gray-50:#F1EFE8;--gray-100:#D3D1C7;--gray-200:#B4B2A9;
+    --gray-600:#5F5E5A;--gray-800:#444441;
+  }
+  body { font-family:'DM Sans',sans-serif; background:#f7f5f0; color:var(--gray-800); min-height:100vh; }
+  nav { background:var(--green-900); display:flex; align-items:center; padding:0 2rem; height:60px; position:sticky; top:0; z-index:100; }
+  nav .brand { font-family:'Playfair Display',serif; font-size:1.25rem; font-weight:400; color:var(--green-50); margin-right:2rem; }
+  nav .nav-links { display:flex; gap:0.25rem; flex:1; }
+  nav a { color:rgba(234,243,222,0.6); text-decoration:none; font-size:0.875rem; font-weight:500; padding:0.4rem 0.9rem; border-radius:8px; transition:background 0.15s,color 0.15s; }
+  nav a:hover,nav a.active { background:rgba(255,255,255,0.12); color:var(--green-50); }
+  nav .user-area { display:flex; align-items:center; gap:0.75rem; margin-left:auto; }
+  nav .username { font-size:0.8rem; color:rgba(234,243,222,0.5); }
+  nav .logout-btn { background:rgba(255,255,255,0.1); border:none; color:var(--green-50); padding:0.35rem 0.85rem; border-radius:8px; font-family:inherit; font-size:0.8rem; cursor:pointer; }
+  #toast { position:fixed; bottom:2rem; right:2rem; padding:0.7rem 1.2rem; border-radius:10px; font-size:0.875rem; opacity:0; transform:translateY(10px); transition:opacity 0.25s,transform 0.25s; pointer-events:none; z-index:999; max-width:340px; background:var(--green-800); color:var(--green-50); }
+  #toast.show { opacity:1; transform:translateY(0); }
+
+  .page { padding:2rem; max-width:1100px; margin:0 auto; }
+
+  .hero {
+    background: linear-gradient(135deg, var(--green-900) 0%, var(--green-800) 100%);
+    border-radius: 20px;
+    padding: 3rem 2.5rem;
+    color: var(--green-50);
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    content: '🌿';
+    position: absolute;
+    right: 2rem; top: 50%;
+    transform: translateY(-50%);
+    font-size: 6rem;
+    opacity: 0.15;
+  }
+  .hero h1 { font-family:'Playfair Display',serif; font-size:2rem; font-weight:400; margin-bottom:0.5rem; }
+  .hero p { font-size:0.95rem; color:rgba(234,243,222,0.65); margin-bottom:1.5rem; }
+  .hero-actions { display:flex; gap:0.75rem; flex-wrap:wrap; }
+  .btn-primary {
+    padding:0.6rem 1.4rem; background:var(--green-50); color:var(--green-900);
+    border:none; border-radius:10px; font-family:inherit; font-size:0.9rem;
+    font-weight:600; cursor:pointer; text-decoration:none; display:inline-block;
+    transition:opacity 0.15s;
+  }
+  .btn-primary:hover { opacity:0.88; }
+  .btn-secondary {
+    padding:0.6rem 1.4rem; background:rgba(255,255,255,0.12); color:var(--green-50);
+    border:1px solid rgba(255,255,255,0.2); border-radius:10px; font-family:inherit;
+    font-size:0.9rem; font-weight:500; cursor:pointer; text-decoration:none;
+    display:inline-block; transition:background 0.15s;
+  }
+  .btn-secondary:hover { background:rgba(255,255,255,0.2); }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stat-card {
+    background: white;
+    border: 1px solid var(--gray-100);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .stat-card .stat-icon { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .stat-card .stat-value { font-family:'Playfair Display',serif; font-size:2rem; font-weight:400; color:var(--green-800); }
+  .stat-card .stat-label { font-size:0.8rem; color:var(--gray-200); }
+
+  .seasons-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .season-card {
+    border-radius: 14px;
+    padding: 1.25rem;
+    text-align: center;
+    text-decoration: none;
+    transition: transform 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .season-card:hover { transform: translateY(-2px); box-shadow: 0 5px 18px rgba(0,0,0,0.1); }
+  .season-card .s-icon { font-size: 2rem; display: block; margin-bottom: 0.5rem; }
+  .season-card .s-name { font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:400; }
+  .season-card .s-count { font-size:0.78rem; margin-top:4px; opacity:0.75; }
+
+  .card-spring { background:#D4EDD3; color:#1A4A19; }
+  .card-summer { background:#FDE9BF; color:#5A3208; }
+  .card-fall   { background:#F5D5C5; color:#5A1A08; }
+  .card-winter { background:#D0E4F5; color:#0A2A4A; }
+
+  .section-title { font-family:'Playfair Display',serif; font-size:1.2rem; font-weight:400; margin-bottom:1rem; }
+
+  .quick-links {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+  .quick-card {
+    background: white;
+    border: 1px solid var(--gray-100);
+    border-radius: 14px;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: var(--gray-800);
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: block;
+  }
+  .quick-card:hover { transform: translateY(-2px); box-shadow: 0 5px 18px rgba(23,52,4,0.08); }
+  .quick-card .qc-icon { font-size: 2rem; margin-bottom: 0.75rem; display: block; }
+  .quick-card .qc-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .quick-card .qc-desc { font-size: 0.8rem; color: var(--gray-200); line-height: 1.5; }
+</style>
+
+<nav>
+  <span class="brand">🌿 Plant Archive</span>
+  <div class="nav-links">
+    <a href="/" class="active">Home</a>
+    <a href="/upload">Upload Photos</a>
+    <a href="/organize">Organize Photos</a>
+  </div>
+  <div class="user-area">
+    <span class="username" id="nav-username"></span>
+    <button class="logout-btn" onclick="doLogout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1 id="hero-greeting">Welcome back</h1>
+    <p>Your personal plant photo archive — organized by season, labeled your way.</p>
+    <div class="hero-actions">
+      <a href="/upload" class="btn-primary">Upload Photos</a>
+      <a href="/organize" class="btn-secondary">Organize</a>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card"><div class="stat-icon">📷</div><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total photos</div></div>
+    <div class="stat-card"><div class="stat-icon">🏷</div><div class="stat-value" id="stat-labels">—</div><div class="stat-label">Labels</div></div>
+    <div class="stat-card"><div class="stat-icon">📥</div><div class="stat-value" id="stat-inbox">—</div><div class="stat-label">In inbox</div></div>
+    <div class="stat-card"><div class="stat-icon">🗓</div><div class="stat-value" id="stat-seasons">—</div><div class="stat-label">Organized by season</div></div>
+  </div>
+
+  <!-- Seasons -->
+  <div class="section-title">Seasons</div>
+  <div class="seasons-row">
+    <a href="/organize?season=spring" class="season-card card-spring">
+      <span class="s-icon">🌸</span>
+      <div class="s-name">Spring</div>
+      <div class="s-count" id="s-spring">— photos</div>
+    </a>
+    <a href="/organize?season=summer" class="season-card card-summer">
+      <span class="s-icon">☀️</span>
+      <div class="s-name">Summer</div>
+      <div class="s-count" id="s-summer">— photos</div>
+    </a>
+    <a href="/organize?season=fall" class="season-card card-fall">
+      <span class="s-icon">🍂</span>
+      <div class="s-name">Fall</div>
+      <div class="s-count" id="s-fall">— photos</div>
+    </a>
+    <a href="/organize?season=winter" class="season-card card-winter">
+      <span class="s-icon">❄️</span>
+      <div class="s-name">Winter</div>
+      <div class="s-count" id="s-winter">— photos</div>
+    </a>
+  </div>
+
+  <!-- Quick links -->
+  <div class="section-title">Quick actions</div>
+  <div class="quick-links">
+    <a href="/upload" class="quick-card">
+      <span class="qc-icon">📤</span>
+      <div class="qc-title">Upload Photos</div>
+      <div class="qc-desc">Drop photos or entire folders into your inbox</div>
+    </a>
+    <a href="/organize" class="quick-card">
+      <span class="qc-icon">🏷</span>
+      <div class="qc-title">Label Photos</div>
+      <div class="qc-desc">Select multiple photos and assign labels in bulk</div>
+    </a>
+    <a href="/organize" class="quick-card">
+      <span class="qc-icon">🗂</span>
+      <div class="qc-title">Organize by Season</div>
+      <div class="qc-desc">Automatically sort your archive into Spring, Summer, Fall, Winter</div>
+    </a>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  async function init() {
+    const res = await fetch('/api/me');
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const user = await res.json();
+    window._userId = user.id;
+    document.getElementById('nav-username').textContent = user.username;
+    document.getElementById('hero-greeting').textContent = `Welcome back, ${user.username}`;
+
+    const stats = await fetch('/api/stats').then(r => r.json());
+    document.getElementById('stat-total').textContent = stats.total;
+    document.getElementById('stat-labels').textContent = stats.label_count;
+    document.getElementById('stat-inbox').textContent = stats.inbox_count;
+
+    const seasonTotal = Object.values(stats.seasons || {}).reduce((a, b) => a + b, 0);
+    document.getElementById('stat-seasons').textContent = seasonTotal;
+
+    const s = stats.seasons || {};
+    document.getElementById('s-spring').textContent = `${s.spring || 0} photos`;
+    document.getElementById('s-summer').textContent = `${s.summer || 0} photos`;
+    document.getElementById('s-fall').textContent  = `${s.fall   || 0} photos`;
+    document.getElementById('s-winter').textContent = `${s.winter || 0} photos`;
+  }
+
+  function doLogout() {
+    fetch('/api/logout', { method:'POST' }).then(() => window.location.href = '/');
+  }
+
+  init();
+</script>
+</body>
+</html>

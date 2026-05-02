@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plant Archive — Upload</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green-50:#EAF3DE;--green-100:#C0DD97;--green-200:#97C459;
+    --green-600:#3B6D11;--green-800:#27500A;--green-900:#173404;
+    --amber-50:#FAEEDA;--amber-400:#BA7517;
+    --gray-50:#F1EFE8;--gray-100:#D3D1C7;--gray-200:#B4B2A9;
+    --gray-600:#5F5E5A;--gray-800:#444441;
+  }
+  body { font-family:'DM Sans',sans-serif; background:#f7f5f0; color:var(--gray-800); min-height:100vh; }
+  nav { background:var(--green-900); display:flex; align-items:center; padding:0 2rem; height:60px; position:sticky; top:0; z-index:100; }
+  nav .brand { font-family:'Playfair Display',serif; font-size:1.25rem; font-weight:400; color:var(--green-50); margin-right:2rem; }
+  nav .nav-links { display:flex; gap:0.25rem; flex:1; }
+  nav a { color:rgba(234,243,222,0.6); text-decoration:none; font-size:0.875rem; font-weight:500; padding:0.4rem 0.9rem; border-radius:8px; transition:background 0.15s,color 0.15s; }
+  nav a:hover,nav a.active { background:rgba(255,255,255,0.12); color:var(--green-50); }
+  nav .user-area { display:flex; align-items:center; gap:0.75rem; margin-left:auto; }
+  nav .username { font-size:0.8rem; color:rgba(234,243,222,0.5); }
+  nav .logout-btn { background:rgba(255,255,255,0.1); border:none; color:var(--green-50); padding:0.35rem 0.85rem; border-radius:8px; font-family:inherit; font-size:0.8rem; cursor:pointer; }
+  #toast { position:fixed; bottom:2rem; right:2rem; padding:0.7rem 1.2rem; border-radius:10px; font-size:0.875rem; opacity:0; transform:translateY(10px); transition:opacity 0.25s,transform 0.25s; pointer-events:none; z-index:999; max-width:340px; background:var(--green-800); color:var(--green-50); }
+  #toast.show { opacity:1; transform:translateY(0); }
+  #toast.toast-error { background:#A32D2D; }
+  #toast.toast-warn { background:var(--amber-400); }
+  #spinner-overlay { display:none; position:fixed; inset:0; background:rgba(23,52,4,0.3); z-index:500; align-items:center; justify-content:center; }
+  #spinner-overlay.show { display:flex; }
+  .spinner-box { background:white; border-radius:16px; padding:2rem 2.5rem; text-align:center; font-family:'Playfair Display',serif; font-size:1rem; color:var(--green-800); }
+  .spinner { width:30px; height:30px; border:3px solid var(--green-100); border-top-color:var(--green-600); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 0.75rem; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .page { padding:2rem; max-width:900px; margin:0 auto; }
+
+  .upload-zone {
+    background: white;
+    border: 2.5px dashed var(--green-100);
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    text-align: center;
+    margin-bottom: 2rem;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: default;
+  }
+  .upload-zone.dragover { border-color:var(--green-600); background:var(--green-50); }
+  .upload-zone .uz-icon { font-size:2.5rem; margin-bottom:0.75rem; display:block; }
+  .upload-zone h2 { font-family:'Playfair Display',serif; font-size:1.4rem; font-weight:400; color:var(--green-800); margin-bottom:0.35rem; }
+  .upload-zone .uz-sub { font-size:0.85rem; color:var(--gray-200); margin-bottom:1.5rem; }
+
+  .upload-controls { display:flex; gap:0.6rem; justify-content:center; flex-wrap:wrap; align-items:center; }
+  .upload-controls input[type="date"] { padding:0.45rem 0.8rem; border:1px solid var(--gray-100); border-radius:8px; font-family:inherit; font-size:0.85rem; background:var(--gray-50); outline:none; }
+  .upload-controls input[type="date"]:focus { border-color:var(--green-200); background:white; }
+  .btn-upload { padding:0.45rem 1.2rem; background:var(--green-800); color:var(--green-50); border-radius:8px; font-size:0.875rem; font-weight:500; cursor:pointer; border:none; font-family:inherit; transition:background 0.15s; }
+  .btn-upload:hover { background:var(--green-900); }
+  label.btn-upload { display:inline-block; }
+  #file-input, #folder-input { display:none; }
+
+  .date-warning { display:none; background:var(--amber-50); border:1px solid #EF9F27; border-radius:8px; padding:0.6rem 0.9rem; font-size:0.82rem; color:var(--amber-400); margin-top:0.75rem; }
+
+  /* inbox stats bar */
+  .inbox-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .inbox-bar h3 { font-family:'Playfair Display',serif; font-size:1.2rem; font-weight:400; }
+  .inbox-count { font-size:0.8rem; color:var(--gray-200); }
+
+  /* photo grid */
+  .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:0.85rem; }
+  .photo-card { background:white; border-radius:12px; overflow:hidden; border:1px solid var(--gray-100); transition:transform 0.15s,box-shadow 0.15s; }
+  .photo-card:hover { transform:translateY(-2px); box-shadow:0 5px 18px rgba(23,52,4,0.1); }
+  .photo-card img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+  .photo-card .info { padding:0.5rem 0.65rem; }
+  .photo-card .p-date { font-size:0.78rem; font-weight:500; color:var(--green-800); }
+  .photo-card .p-label { font-size:0.7rem; color:var(--gray-200); margin-top:2px; font-style:italic; }
+
+  .empty-state { text-align:center; padding:3.5rem 2rem; color:var(--gray-200); }
+  .empty-state .icon { font-size:2.5rem; margin-bottom:0.75rem; }
+  .empty-state p { font-size:0.875rem; }
+</style>
+
+<nav>
+  <span class="brand">🌿 Plant Archive</span>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/upload" class="active">Upload Photos</a>
+    <a href="/organize">Organize Photos</a>
+  </div>
+  <div class="user-area">
+    <span class="username" id="nav-username"></span>
+    <button class="logout-btn" onclick="doLogout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Upload zone -->
+  <div class="upload-zone" id="drop-zone">
+    <span class="uz-icon">📷</span>
+    <h2>Drop photos or folders here</h2>
+    <p class="uz-sub">Everything lands in your inbox — label them later in Organize · Videos are skipped</p>
+    <div class="upload-controls">
+      <input type="date" id="manual-date" title="Only needed if photo has no EXIF date" />
+      <label class="btn-upload" for="file-input">Browse files</label>
+      <label class="btn-upload" for="folder-input" style="background:var(--green-600)">Browse folder</label>
+      <input type="file" id="file-input" multiple accept=".jpg,.jpeg,.png,.heic,.heif,.tiff" />
+      <input type="file" id="folder-input" multiple webkitdirectory />
+    </div>
+    <div class="date-warning" id="date-warning">⚠ Some photos had no EXIF date. Set a date above and re-drop them.</div>
+  </div>
+
+  <!-- Inbox -->
+  <div class="inbox-bar">
+    <h3>📥 Inbox</h3>
+    <span class="inbox-count" id="inbox-count"></span>
+  </div>
+
+  <div id="photo-grid-wrap">
+    <div class="empty-state" id="empty-state">
+      <div class="icon">🌱</div>
+      <p>Your inbox is empty — drop some photos above</p>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+<div id="spinner-overlay"><div class="spinner-box"><div class="spinner"></div>Uploading...</div></div>
+
+<script>
+  const VIDEO_EXTS = new Set(['.mp4','.mov','.avi','.mkv','.m4v','.wmv','.flv','.webm','.3gp']);
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+  const folderInput= document.getElementById('folder-input');
+
+  async function init() {
+    const res = await fetch('/api/me');
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const user = await res.json();
+    window._userId = user.id;
+    document.getElementById('nav-username').textContent = user.username;
+    loadInbox();
+  }
+
+  // ── Drag & drop ───────────────────────────────────────────────────────────
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', async e => {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    handleFiles(await collectDroppedFiles(e.dataTransfer));
+  });
+  fileInput.addEventListener('change', () => handleFiles(Array.from(fileInput.files)));
+  folderInput.addEventListener('change', () => handleFiles(Array.from(folderInput.files)));
+
+  async function collectDroppedFiles(dt) {
+    const files = [];
+    for (const item of Array.from(dt.items || [])) {
+      if (item.kind !== 'file') continue;
+      const entry = item.webkitGetAsEntry?.();
+      if (entry?.isDirectory) files.push(...await readDir(entry));
+      else { const f = item.getAsFile(); if (f) files.push(f); }
+    }
+    return files.length ? files : Array.from(dt.files || []);
+  }
+
+  function readDir(dir) {
+    return new Promise(resolve => {
+      const results = []; const reader = dir.createReader();
+      function batch() {
+        reader.readEntries(async entries => {
+          if (!entries.length) { resolve(results); return; }
+          for (const e of entries) {
+            if (e.isFile) results.push(await new Promise(r => e.file(r)));
+            else if (e.isDirectory) results.push(...await readDir(e));
+          }
+          batch();
+        });
+      }
+      batch();
+    });
+  }
+
+  // ── Upload ────────────────────────────────────────────────────────────────
+  async function handleFiles(files) {
+    if (!files.length) return;
+    const videos = files.filter(f => VIDEO_EXTS.has(ext(f.name)));
+    const toUpload = files.filter(f => !VIDEO_EXTS.has(ext(f.name)));
+    if (videos.length) showToast('Can not handle videos', 'warn');
+    if (!toUpload.length) return;
+
+    document.getElementById('spinner-overlay').classList.add('show');
+    let ok = 0, noDate = [];
+
+    for (const file of toUpload) {
+      const fd = new FormData();
+      fd.append('file', file);
+      const d = document.getElementById('manual-date').value;
+      if (d) fd.append('date', d);
+      try {
+        const res = await fetch('/api/upload', { method:'POST', body:fd });
+        const data = await res.json();
+        if (res.status === 422 && data.error === 'no_date') noDate.push(file.name);
+        else if (data.success) ok++;
+      } catch { showToast('Upload failed — server running?', 'error'); }
+    }
+
+    document.getElementById('spinner-overlay').classList.remove('show');
+
+    if (noDate.length) {
+      document.getElementById('date-warning').style.display = 'block';
+      showToast(`Set a date and retry: ${noDate.slice(0,3).join(', ')}${noDate.length>3?'…':''}`, 'warn');
+    } else {
+      document.getElementById('date-warning').style.display = 'none';
+    }
+
+    if (ok) {
+      showToast(`${ok} photo${ok>1?'s':''} added to inbox`);
+      fileInput.value = ''; folderInput.value = '';
+      loadInbox();
+    }
+  }
+
+  // ── Inbox ─────────────────────────────────────────────────────────────────
+  async function loadInbox() {
+    const photos = await fetch('/api/photos/label/inbox').then(r => r.json());
+    document.getElementById('inbox-count').textContent =
+      `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
+
+    const wrap = document.getElementById('photo-grid-wrap');
+    if (!photos.length) {
+      wrap.innerHTML = `<div class="empty-state"><div class="icon">🌱</div><p>Your inbox is empty — drop some photos above</p></div>`;
+      return;
+    }
+
+    wrap.innerHTML = `<div class="photo-grid">${photos.map(p => `
+      <div class="photo-card">
+        <img src="/uploads/user_${window._userId}/inbox/${p.stored_filename}" loading="lazy"
+             onerror="this.style.background='#EAF3DE';this.style.height='155px'">
+        <div class="info">
+          <div class="p-date">${fmtDate(p.date_taken)}</div>
+          <div class="p-label">${p.label || 'unlabeled'}</div>
+        </div>
+      </div>
+    `).join('')}</div>`;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function ext(name) { return name.slice(name.lastIndexOf('.')).toLowerCase(); }
+  function fmtDate(d) {
+    if (!d) return 'Unknown date';
+    return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `show toast-${type}`;
+    clearTimeout(t._timer); t._timer = setTimeout(() => t.className='', 3500);
+  }
+  function doLogout() { fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/'); }
+
+  init();
+</script>
+</body>
+</html>

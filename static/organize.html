@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plant Archive — Organize</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --green-50:#EAF3DE;--green-100:#C0DD97;--green-200:#97C459;
+    --green-600:#3B6D11;--green-800:#27500A;--green-900:#173404;
+    --amber-50:#FAEEDA;--amber-400:#BA7517;
+    --gray-50:#F1EFE8;--gray-100:#D3D1C7;--gray-200:#B4B2A9;
+    --gray-600:#5F5E5A;--gray-800:#444441;
+  }
+  body { font-family:'DM Sans',sans-serif; background:#f7f5f0; color:var(--gray-800); min-height:100vh; }
+  nav { background:var(--green-900); display:flex; align-items:center; padding:0 2rem; height:60px; position:sticky; top:0; z-index:100; }
+  nav .brand { font-family:'Playfair Display',serif; font-size:1.25rem; font-weight:400; color:var(--green-50); margin-right:2rem; }
+  nav .nav-links { display:flex; gap:0.25rem; flex:1; }
+  nav a { color:rgba(234,243,222,0.6); text-decoration:none; font-size:0.875rem; font-weight:500; padding:0.4rem 0.9rem; border-radius:8px; transition:background 0.15s,color 0.15s; }
+  nav a:hover,nav a.active { background:rgba(255,255,255,0.12); color:var(--green-50); }
+  nav .user-area { display:flex; align-items:center; gap:0.75rem; margin-left:auto; }
+  nav .username { font-size:0.8rem; color:rgba(234,243,222,0.5); }
+  nav .logout-btn { background:rgba(255,255,255,0.1); border:none; color:var(--green-50); padding:0.35rem 0.85rem; border-radius:8px; font-family:inherit; font-size:0.8rem; cursor:pointer; }
+  #toast { position:fixed; bottom:2rem; right:2rem; padding:0.7rem 1.2rem; border-radius:10px; font-size:0.875rem; opacity:0; transform:translateY(10px); transition:opacity 0.25s,transform 0.25s; pointer-events:none; z-index:999; max-width:340px; background:var(--green-800); color:var(--green-50); }
+  #toast.show { opacity:1; transform:translateY(0); }
+  #toast.toast-error { background:#A32D2D; }
+  #toast.toast-warn { background:var(--amber-400); }
+  #toast.toast-info { background:var(--green-600); }
+  #spinner-overlay { display:none; position:fixed; inset:0; background:rgba(23,52,4,0.3); z-index:500; align-items:center; justify-content:center; }
+  #spinner-overlay.show { display:flex; }
+  .spinner-box { background:white; border-radius:16px; padding:2rem 2.5rem; text-align:center; font-family:'Playfair Display',serif; font-size:1rem; color:var(--green-800); }
+  .spinner { width:30px; height:30px; border:3px solid var(--green-100); border-top-color:var(--green-600); border-radius:50%; animation:spin 0.7s linear infinite; margin:0 auto 0.75rem; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .layout { display:grid; grid-template-columns:240px 1fr; min-height:calc(100vh - 60px); }
+
+  /* Sidebar */
+  .sidebar { background:white; border-right:1px solid var(--gray-100); padding:1.25rem 1rem; }
+  .sb-label { font-size:0.68rem; font-weight:500; letter-spacing:0.12em; text-transform:uppercase; color:var(--gray-200); padding:0.5rem 0.75rem 0.25rem; }
+  .sb-item { display:flex; align-items:center; justify-content:space-between; padding:0.5rem 0.75rem; border-radius:8px; cursor:pointer; font-size:0.875rem; transition:background 0.15s; }
+  .sb-item:hover { background:var(--green-50); }
+  .sb-item.active { background:var(--green-50); color:var(--green-800); font-weight:500; }
+  .sb-count { font-size:0.72rem; color:var(--gray-200); background:var(--gray-50); padding:2px 7px; border-radius:20px; }
+  .sb-item.active .sb-count { background:var(--green-100); color:var(--green-800); }
+
+  .season-item { display:flex; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; border-radius:8px; cursor:pointer; font-size:0.875rem; transition:background 0.15s; text-decoration:none; color:var(--gray-800); }
+  .season-item:hover { background:var(--green-50); }
+  .season-item.active { background:var(--green-50); font-weight:500; }
+
+  /* Season organize box */
+  .organize-box {
+    background: linear-gradient(135deg, var(--green-900), var(--green-800));
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-top: 1rem;
+    color: var(--green-50);
+  }
+  .organize-box h4 { font-family:'Playfair Display',serif; font-size:0.95rem; font-weight:400; margin-bottom:0.4rem; }
+  .organize-box p { font-size:0.75rem; color:rgba(234,243,222,0.6); margin-bottom:0.85rem; line-height:1.5; }
+  .btn-organize { width:100%; padding:0.55rem; background:var(--green-50); color:var(--green-900); border:none; border-radius:8px; font-family:inherit; font-size:0.85rem; font-weight:600; cursor:pointer; transition:opacity 0.15s; }
+  .btn-organize:hover { opacity:0.88; }
+
+  /* Main */
+  .main { padding:1.75rem 2rem; }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  .toolbar-left { display:flex; align-items:center; gap:0.75rem; }
+  .toolbar-title { font-family:'Playfair Display',serif; font-size:1.3rem; font-weight:400; text-transform:capitalize; }
+  .toolbar-count { font-size:0.8rem; color:var(--gray-200); }
+
+  .toolbar-right { display:flex; align-items:center; gap:0.6rem; }
+
+  .btn { padding:0.45rem 1rem; border-radius:8px; font-family:inherit; font-size:0.85rem; font-weight:500; cursor:pointer; border:none; transition:background 0.15s; }
+  .btn-select { background:var(--gray-50); color:var(--gray-800); border:1px solid var(--gray-100); }
+  .btn-select:hover { background:var(--gray-100); }
+  .btn-select.active { background:var(--green-50); color:var(--green-800); border-color:var(--green-100); }
+  .btn-green { background:var(--green-800); color:var(--green-50); }
+  .btn-green:hover { background:var(--green-900); }
+  .btn-cancel { background:var(--gray-50); color:var(--gray-600); border:1px solid var(--gray-100); }
+
+  /* Label bar (shows when photos selected) */
+  .label-bar {
+    display: none;
+    background: white;
+    border: 1px solid var(--gray-100);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .label-bar.show { display:flex; }
+  .label-bar .sel-count { font-size:0.85rem; color:var(--gray-600); white-space:nowrap; }
+  .label-bar input { flex:1; min-width:160px; padding:0.4rem 0.75rem; border:1px solid var(--gray-100); border-radius:8px; font-family:inherit; font-size:0.85rem; outline:none; }
+  .label-bar input:focus { border-color:var(--green-200); }
+
+  /* Photo grid */
+  .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:0.85rem; }
+  .photo-card { background:white; border-radius:12px; overflow:hidden; border:1px solid var(--gray-100); transition:transform 0.15s,box-shadow 0.15s; position:relative; cursor:pointer; }
+  .photo-card:hover { transform:translateY(-2px); box-shadow:0 5px 18px rgba(23,52,4,0.1); }
+  .photo-card img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+  .photo-card .info { padding:0.5rem 0.65rem; }
+  .photo-card .p-date { font-size:0.78rem; font-weight:500; color:var(--green-800); }
+  .photo-card .p-label { font-size:0.7rem; color:var(--gray-200); margin-top:2px; text-transform:capitalize; }
+
+  /* checkbox */
+  .photo-card .cb-wrap { position:absolute; top:6px; left:6px; display:none; }
+  .select-mode .photo-card .cb-wrap { display:block; }
+  .photo-card .cb-wrap input { width:18px; height:18px; accent-color:var(--green-600); cursor:pointer; }
+  .photo-card.selected { outline:2.5px solid var(--green-600); }
+  .photo-card.selected::after { content:''; position:absolute; inset:0; background:rgba(59,109,17,0.07); pointer-events:none; }
+
+  /* season badges */
+  .season-badge { display:inline-block; font-size:0.62rem; font-weight:600; padding:2px 5px; border-radius:4px; margin-top:3px; text-transform:capitalize; }
+  .badge-spring { background:#D4EDD3; color:#2D6B2B; }
+  .badge-summer { background:#FDE9BF; color:#7A4F0A; }
+  .badge-fall   { background:#F5D5C5; color:#7A2A0A; }
+  .badge-winter { background:#D0E4F5; color:#1A4A6E; }
+
+  .empty-state { text-align:center; padding:3.5rem 2rem; color:var(--gray-200); }
+  .empty-state .icon { font-size:2.5rem; margin-bottom:0.75rem; }
+  .empty-state p { font-size:0.875rem; }
+
+  /* label chips in sidebar */
+  .label-chip { display:inline-block; background:var(--green-50); color:var(--green-800); font-size:0.72rem; padding:2px 8px; border-radius:12px; margin:1px; cursor:pointer; text-transform:capitalize; border:1px solid var(--green-100); }
+  .label-chip:hover { background:var(--green-100); }
+</style>
+
+<nav>
+  <span class="brand">🌿 Plant Archive</span>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/upload">Upload Photos</a>
+    <a href="/organize" class="active">Organize Photos</a>
+  </div>
+  <div class="user-area">
+    <span class="username" id="nav-username"></span>
+    <button class="logout-btn" onclick="doLogout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sb-label">Labels</div>
+    <div class="sb-item active" id="sb-all" onclick="loadView('all', this)">
+      All photos <span class="sb-count" id="sb-all-count">0</span>
+    </div>
+    <div class="sb-item" id="sb-inbox" onclick="loadView('inbox', this)">
+      📥 Inbox <span class="sb-count" id="sb-inbox-count">0</span>
+    </div>
+    <div id="label-list"></div>
+
+    <div class="sb-label" style="margin-top:1rem;">Seasons</div>
+    <div class="sb-item" id="sb-spring" onclick="loadView('season:spring', this)">🌸 Spring <span class="sb-count" id="s-spring">0</span></div>
+    <div class="sb-item" id="sb-summer" onclick="loadView('season:summer', this)">☀️ Summer <span class="sb-count" id="s-summer">0</span></div>
+    <div class="sb-item" id="sb-fall"   onclick="loadView('season:fall',   this)">🍂 Fall   <span class="sb-count" id="s-fall">0</span></div>
+    <div class="sb-item" id="sb-winter" onclick="loadView('season:winter', this)">❄️ Winter <span class="sb-count" id="s-winter">0</span></div>
+
+    <div class="organize-box">
+      <h4>🗂 Organize by Season</h4>
+      <p>Copies all photos into season folders based on the date they were taken.</p>
+      <button class="btn-organize" onclick="runOrganize()">Organize All Now</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="toolbar-title" id="view-title">All photos</div>
+        <div class="toolbar-count" id="view-count"></div>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn btn-select" id="btn-select" onclick="toggleSelectMode()">Select</button>
+        <button class="btn btn-cancel" id="btn-cancel" onclick="cancelSelect()" style="display:none">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Label assignment bar -->
+    <div class="label-bar" id="label-bar">
+      <span class="sel-count" id="sel-count">0 selected</span>
+      <input type="text" id="label-input" placeholder="Enter label name..." />
+      <button class="btn btn-green" onclick="applyLabel()">Apply Label</button>
+      <button class="btn btn-cancel" onclick="cancelSelect()">Cancel</button>
+    </div>
+
+    <!-- Photo grid -->
+    <div id="grid-wrap">
+      <div class="empty-state">
+        <div class="icon">🌱</div>
+        <p>Loading...</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+<div id="spinner-overlay"><div class="spinner-box"><div class="spinner"></div><span id="spinner-msg">Working...</span></div></div>
+
+<script>
+  let allPhotos = [];
+  let currentView = 'all';
+  let selectMode = false;
+  let selectedIds = new Set();
+
+  async function init() {
+    const res = await fetch('/api/me');
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const user = await res.json();
+    window._userId = user.id;
+    document.getElementById('nav-username').textContent = user.username;
+
+    // Check if season was requested via URL
+    const params = new URLSearchParams(window.location.search);
+    const season = params.get('season');
+
+    await loadSidebar();
+    if (season) {
+      const el = document.getElementById(`sb-${season}`);
+      loadView(`season:${season}`, el);
+    } else {
+      loadView('all', document.getElementById('sb-all'));
+    }
+  }
+
+  // ── Sidebar ───────────────────────────────────────────────────────────────
+  async function loadSidebar() {
+    const [labelData, photos] = await Promise.all([
+      fetch('/api/labels').then(r => r.json()),
+      fetch('/api/photos').then(r => r.json())
+    ]);
+
+    document.getElementById('sb-all-count').textContent = photos.length;
+    document.getElementById('sb-inbox-count').textContent = labelData.inbox_count;
+
+    // label list
+    const list = document.getElementById('label-list');
+    list.innerHTML = labelData.labels.map(l => `
+      <div class="sb-item" id="sb-label-${l.label}" onclick="loadView('label:${l.label}', this)">
+        <span style="text-transform:capitalize">${l.label}</span>
+        <span class="sb-count">${l.count}</span>
+      </div>
+    `).join('');
+
+    // season counts from photos
+    const seasons = { spring:0, summer:0, fall:0, winter:0 };
+    photos.forEach(p => { if (p.season) seasons[p.season] = (seasons[p.season]||0) + 1; });
+    Object.entries(seasons).forEach(([s, c]) => {
+      const el = document.getElementById(`s-${s}`);
+      if (el) el.textContent = c;
+    });
+  }
+
+  // ── Load view ─────────────────────────────────────────────────────────────
+  async function loadView(view, el) {
+    cancelSelect();
+    currentView = view;
+    document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('active'));
+    if (el) el.classList.add('active');
+
+    let photos = [];
+    let title = 'All photos';
+
+    if (view === 'all') {
+      photos = await fetch('/api/photos').then(r => r.json());
+      title = 'All photos';
+    } else if (view === 'inbox') {
+      photos = await fetch('/api/photos/label/inbox').then(r => r.json());
+      title = '📥 Inbox';
+    } else if (view.startsWith('label:')) {
+      const label = view.slice(6);
+      photos = await fetch(`/api/photos/label/${encodeURIComponent(label)}`).then(r => r.json());
+      title = label;
+    } else if (view.startsWith('season:')) {
+      const season = view.slice(7);
+      photos = await fetch(`/api/photos/season/${season}`).then(r => r.json());
+      title = `${seasonEmoji(season)} ${season.charAt(0).toUpperCase() + season.slice(1)}`;
+    }
+
+    allPhotos = photos;
+    document.getElementById('view-title').textContent = title;
+    document.getElementById('view-count').textContent =
+      `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
+
+    renderGrid(photos);
+  }
+
+  // ── Render grid ───────────────────────────────────────────────────────────
+  function renderGrid(photos) {
+    const wrap = document.getElementById('grid-wrap');
+    if (!photos.length) {
+      wrap.innerHTML = `<div class="empty-state"><div class="icon">🌱</div><p>No photos here yet</p></div>`;
+      return;
+    }
+
+    const gridClass = selectMode ? 'photo-grid select-mode' : 'photo-grid';
+    wrap.innerHTML = `<div class="${gridClass}" id="photo-grid">${photos.map(p => {
+      const src = `/uploads/user_${window._userId}/inbox/${p.stored_filename}`;
+      const selected = selectedIds.has(p.id) ? 'selected' : '';
+      const checked = selectedIds.has(p.id) ? 'checked' : '';
+      const seasonBadge = p.season
+        ? `<span class="season-badge badge-${p.season}">${seasonEmoji(p.season)} ${p.season}</span>` : '';
+      return `
+        <div class="photo-card ${selected}" data-id="${p.id}" onclick="cardClick(event, ${p.id})">
+          <div class="cb-wrap"><input type="checkbox" ${checked} onclick="cbClick(event, ${p.id})"></div>
+          <img src="${src}" loading="lazy" onerror="this.style.background='#EAF3DE';this.style.height='155px'">
+          <div class="info">
+            <div class="p-date">${fmtDate(p.date_taken)}</div>
+            <div class="p-label">${p.label || 'unlabeled'}</div>
+            ${seasonBadge}
+          </div>
+        </div>`;
+    }).join('')}</div>`;
+  }
+
+  // ── Select mode ───────────────────────────────────────────────────────────
+  function toggleSelectMode() {
+    selectMode = !selectMode;
+    const btn = document.getElementById('btn-select');
+    const cancel = document.getElementById('btn-cancel');
+    btn.classList.toggle('active', selectMode);
+    btn.style.display = selectMode ? 'none' : '';
+    cancel.style.display = selectMode ? '' : 'none';
+    document.getElementById('label-bar').classList.toggle('show', selectMode);
+    if (!selectMode) { selectedIds.clear(); }
+    renderGrid(allPhotos);
+    updateSelCount();
+  }
+
+  function cancelSelect() {
+    selectMode = false;
+    selectedIds.clear();
+    document.getElementById('btn-select').classList.remove('active');
+    document.getElementById('btn-select').style.display = '';
+    document.getElementById('btn-cancel').style.display = 'none';
+    document.getElementById('label-bar').classList.remove('show');
+    renderGrid(allPhotos);
+  }
+
+  function cardClick(e, id) {
+    if (!selectMode) return;
+    if (e.target.type === 'checkbox') return;
+    toggleSelect(id);
+  }
+
+  function cbClick(e, id) {
+    e.stopPropagation();
+    toggleSelect(id);
+  }
+
+  function toggleSelect(id) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    const card = document.querySelector(`.photo-card[data-id="${id}"]`);
+    if (card) {
+      card.classList.toggle('selected', selectedIds.has(id));
+      const cb = card.querySelector('input[type=checkbox]');
+      if (cb) cb.checked = selectedIds.has(id);
+    }
+    updateSelCount();
+  }
+
+  function updateSelCount() {
+    document.getElementById('sel-count').textContent =
+      `${selectedIds.size} selected`;
+  }
+
+  // ── Apply label ───────────────────────────────────────────────────────────
+  async function applyLabel() {
+    const label = document.getElementById('label-input').value.trim();
+    if (!label) { showToast('Enter a label name', 'warn'); return; }
+    if (!selectedIds.size) { showToast('Select some photos first', 'warn'); return; }
+
+    const res = await fetch('/api/photos/label', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo_ids: Array.from(selectedIds), label })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast(`Label "${label}" applied to ${data.updated} photo${data.updated !== 1 ? 's' : ''}`);
+      document.getElementById('label-input').value = '';
+      cancelSelect();
+      await loadSidebar();
+      loadView(currentView, document.querySelector('.sb-item.active'));
+    } else {
+      showToast(data.error || 'Failed to apply label', 'error');
+    }
+  }
+
+  // Enter key on label input
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('label-input')?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') applyLabel();
+    });
+  });
+
+  // ── Season organize ───────────────────────────────────────────────────────
+  async function runOrganize() {
+    document.getElementById('spinner-msg').textContent = 'Organizing by season...';
+    document.getElementById('spinner-overlay').classList.add('show');
+
+    const res = await fetch('/api/organize/seasons', { method: 'POST' });
+    const data = await res.json();
+    document.getElementById('spinner-overlay').classList.remove('show');
+
+    if (data.success) {
+      showToast(`✓ ${data.organized} photos organized${data.skipped ? ` · ${data.skipped} skipped (no date)` : ''}`, 'info');
+      await loadSidebar();
+      loadView(currentView, document.querySelector('.sb-item.active'));
+    } else {
+      showToast('Organize failed', 'error');
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function seasonEmoji(s) {
+    return { spring:'🌸', summer:'☀️', fall:'🍂', winter:'❄️' }[s] || '';
+  }
+  function fmtDate(d) {
+    if (!d) return 'Unknown date';
+    return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `show toast-${type}`;
+    clearTimeout(t._timer); t._timer = setTimeout(() => t.className='', 4000);
+  }
+  function doLogout() { fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/'); }
+
+  init();
+</script>
+</body>
+</html>
