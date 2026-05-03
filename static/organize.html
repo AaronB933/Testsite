@@ -316,8 +316,8 @@
   const SO = ['spring','summer','fall','winter'];
   const YEARS = Array.from({length:12},(_,i)=>2026-i);
 
-  const PAGE_SIZE = 50;
-  let allPhotos=[], displayedPhotos=[], currentPage=1, currentView='all', selectedIds=new Set();
+  let allPhotos=[], currentView='all', selectedIds=new Set();
+  let currentOffset=0, currentTotal=0, currentLoadingView=null, isLoading=false;
   let openYears=new Set(), openPlants=new Set();
   let lbIndex=0, confirmCallback=null, isTrashView=false;
 
@@ -343,14 +343,14 @@
 
   // ── Sidebar ───────────────────────────────────────────────────────────────
   async function loadSidebar(){
-    const [labelData,plantTree,yearTree,trashed,allP]=await Promise.all([
+    const [labelData,plantTree,yearTree,trashed,stats]=await Promise.all([
       fetch('/api/labels').then(r=>r.json()),
       fetch('/api/plant-tree').then(r=>r.json()),
       fetch('/api/year-tree').then(r=>r.json()),
       fetch('/api/photos/trash').then(r=>r.json()),
-      fetch('/api/photos').then(r=>r.json())
+      fetch('/api/stats').then(r=>r.json())
     ]);
-    document.getElementById('sb-all-count').textContent=allP.length;
+    document.getElementById('sb-all-count').textContent=stats.total;
     document.getElementById('sb-inbox-count').textContent=labelData.inbox_count;
     document.getElementById('sb-trash-count').textContent=trashed.length;
 
@@ -430,41 +430,34 @@
   }
 
   // ── Load view ─────────────────────────────────────────────────────────────
-  async function loadView(view,el){
+  async function loadView(view, el){
     clearSelection();
-    currentView=view;
-    isTrashView=(view==='trash');
+    currentView = view;
+    currentOffset = 0;
+    currentTotal = 0;
+    allPhotos = [];
+    isTrashView = (view==='trash');
+    currentLoadingView = view;
+
     document.querySelectorAll('.sb-item,.sub-row,.variety-row,.tree-row').forEach(i=>i.classList.remove('active'));
     if(el) el.classList.add('active');
 
-    let photos=[],title='';
-    if(view==='all'){photos=await fetch('/api/photos').then(r=>r.json());title='All photos';}
-    else if(view==='inbox'){photos=await fetch('/api/photos/label/inbox').then(r=>r.json());title='📥 Inbox';}
-    else if(view==='trash'){photos=await fetch('/api/photos/trash').then(r=>r.json());title='🗑 Trash';}
-    else if(view.startsWith('label:')){
-      const label=view.slice(6);
-      photos=await fetch(`/api/photos/label/${encodeURIComponent(label)}`).then(r=>r.json());
-      title=`🌱 ${label}`;
-    } else if(view.startsWith('plant:')){
+    let title='';
+    if(view==='all') title='All photos';
+    else if(view==='inbox') title='📥 Inbox';
+    else if(view==='trash') title='🗑 Trash';
+    else if(view.startsWith('label:')) title=`🌱 ${view.slice(6)}`;
+    else if(view.startsWith('plant:')){
       const parts=view.split(':');
-      const label=parts[1],variety=parts[2];
-      photos=await fetch(`/api/photos/label/${encodeURIComponent(label)}/variety/${encodeURIComponent(variety)}`).then(r=>r.json());
-      title=`🌿 ${label}${variety!=='no-variety'?' › '+variety:''}`;
+      title=`🌿 ${parts[1]}${parts[2]!=='no-variety'?' › '+parts[2]:''}`;
     } else if(view.startsWith('year:')){
       const parts=view.split(':');
-      const year=parts[1],season=parts[2];
-      if(season){
-        photos=await fetch(`/api/photos/year/${year}/season/${season}`).then(r=>r.json());
-        title=`${SE[season]} ${season.charAt(0).toUpperCase()+season.slice(1)} ${year}`;
-      } else {
-        photos=await fetch(`/api/photos/year/${year}`).then(r=>r.json());
-        title=`📅 ${year}`;
-      }
+      if(parts[2]) title=`${SE[parts[2]]} ${parts[2].charAt(0).toUpperCase()+parts[2].slice(1)} ${parts[1]}`;
+      else title=`📅 ${parts[1]}`;
     }
 
-    allPhotos=photos;
     document.getElementById('view-title').textContent=title;
-    document.getElementById('view-count').textContent=`${photos.length} photo${photos.length!==1?'s':''}`;
+    document.getElementById('view-count').textContent='Loading...';
 
     const tbRight=document.getElementById('toolbar-right');
     if(isTrashView){
@@ -473,10 +466,72 @@
         <button class="btn btn-red" onclick="permanentDeleteSelected()">✕ Delete Forever</button>`;
     } else { tbRight.innerHTML=''; }
 
-    currentPage = 1;
-    displayedPhotos = photos.slice(0, PAGE_SIZE);
-    renderGrid(displayedPhotos);
-    renderLoadMore(photos);
+    document.getElementById('grid-wrap').innerHTML=`<div class="empty-state"><div class="icon">⏳</div><p>Loading...</p></div>`;
+    const existing = document.getElementById('load-more-bar');
+    if(existing) existing.remove();
+
+    await loadMorePhotos(view, true);
+  }
+
+  async function fetchPhotosForView(view, limit, offset){
+    if(view==='all') {
+      const r = await fetch(`/api/photos?limit=${limit}&offset=${offset}`).then(r=>r.json());
+      return r;
+    } else if(view==='inbox') {
+      const r = await fetch(`/api/photos/label/inbox?limit=${limit}&offset=${offset}`).then(r=>r.json());
+      return r;
+    } else if(view==='trash') {
+      const photos = await fetch('/api/photos/trash').then(r=>r.json());
+      return {photos, total: photos.length};
+    } else if(view.startsWith('label:')) {
+      const label=view.slice(6);
+      const r = await fetch(`/api/photos/label/${encodeURIComponent(label)}?limit=${limit}&offset=${offset}`).then(r=>r.json());
+      return r;
+    } else if(view.startsWith('plant:')) {
+      const parts=view.split(':');
+      const r = await fetch(`/api/photos/label/${encodeURIComponent(parts[1])}/variety/${encodeURIComponent(parts[2])}`).then(r=>r.json());
+      return {photos: r.photos || r, total: r.total || (r.photos || r).length};
+    } else if(view.startsWith('year:')) {
+      const parts=view.split(':');
+      let r;
+      if(parts[2]) r = await fetch(`/api/photos/year/${parts[1]}/season/${parts[2]}`).then(r=>r.json());
+      else r = await fetch(`/api/photos/year/${parts[1]}`).then(r=>r.json());
+      return {photos: r.photos || r, total: r.total || (r.photos || r).length};
+    }
+    return {photos:[], total:0};
+  }
+
+  async function loadMorePhotos(view, reset=false){
+    if(isLoading) return;
+    isLoading = true;
+    const BATCH = 50;
+    const data = await fetchPhotosForView(view, BATCH, currentOffset);
+    const newPhotos = data.photos || [];
+    currentTotal = data.total || 0;
+
+    if(reset) allPhotos = newPhotos;
+    else allPhotos = [...allPhotos, ...newPhotos];
+
+    currentOffset += newPhotos.length;
+    isLoading = false;
+
+    document.getElementById('view-count').textContent=`${currentOffset} of ${currentTotal} photo${currentTotal!==1?'s':''}`;
+    renderGrid(allPhotos);
+    updateLoadMoreBar();
+  }
+
+  function updateLoadMoreBar(){
+    const existing = document.getElementById('load-more-bar');
+    if(existing) existing.remove();
+    if(currentOffset >= currentTotal) return;
+    const remaining = currentTotal - currentOffset;
+    const bar = document.createElement('div');
+    bar.id = 'load-more-bar';
+    bar.style.cssText='text-align:center;padding:1.5rem;';
+    bar.innerHTML=`
+      <span style="font-size:.82rem;color:var(--gray200);margin-right:1rem;">${currentOffset} of ${currentTotal} shown</span>
+      <button class="btn btn-ghost" onclick="loadMorePhotos('${currentView}')">Load ${Math.min(50,remaining)} more</button>`;
+    document.getElementById('grid-wrap').after(bar);
   }
 
   // ── Render grid ───────────────────────────────────────────────────────────
@@ -524,21 +579,6 @@
     document.getElementById('grid-wrap').after(bar);
   }
 
-  function loadMore(){
-    currentPage++;
-    const next = allPhotos.slice(0, currentPage * PAGE_SIZE);
-    displayedPhotos = next;
-    renderGrid(next);
-    renderLoadMore(allPhotos);
-  }
-
-  function loadAll(){
-    displayedPhotos = allPhotos;
-    renderGrid(allPhotos);
-    const bar = document.getElementById('load-more-bar');
-    if(bar) bar.remove();
-  }
-
   // ── Selection ─────────────────────────────────────────────────────────────
   function cardMD(e,id){e.stopPropagation();}
   function cardClick(e,id){
@@ -561,7 +601,7 @@
     updateSelBar();
   }
   function clearSelection(){selectedIds.clear();document.querySelectorAll('.photo-card.selected').forEach(c=>c.classList.remove('selected'));updateSelBar();}
-  function selectAll(){allPhotos.forEach(p=>selectedIds.add(p.id));renderGrid(displayedPhotos);updateSelBar();}
+  function selectAll(){allPhotos.forEach(p=>selectedIds.add(p.id));renderGrid(allPhotos);updateSelBar();}
   function updateSelBar(){
     const bar=document.getElementById('sel-bar');
     bar.classList.toggle('show',selectedIds.size>0);
@@ -798,15 +838,10 @@
     document.getElementById('confirm-dialog').classList.add('show');
   }
   function closeConfirm(){document.getElementById('confirm-dialog').classList.remove('show');confirmCallback=null;}
-  async function confirmOk(){closeConfirm();if(confirmCallback)await confirmCallback();}
+  async function confirmOk(){const cb=confirmCallback;closeConfirm();if(cb)await cb();}
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  function fmtDate(d){
-    if(!d)return 'Unknown date';
-    const dt = new Date(d);
-    if(isNaN(dt)) return 'Unknown date';
-    return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-  }
+  function fmtDate(d){if(!d)return 'Unknown date';const dt=new Date(d);if(isNaN(dt))return 'Unknown date';return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
   function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`show toast-${type}`;clearTimeout(t._timer);t._timer=setTimeout(()=>t.className='',4000);}
   function doLogout(){fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/');}
 

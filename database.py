@@ -6,6 +6,13 @@ import bcrypt
 from db import engine, execute, execute_write, execute_write_returning
 from sqlalchemy import text
 
+def _build_in_clause(ids, prefix='id'):
+    """Build PostgreSQL/SQLite IN clause from a list of IDs."""
+    placeholders = ', '.join(f':{prefix}{i}' for i in range(len(ids)))
+    params = {f'{prefix}{i}': v for i, v in enumerate(ids)}
+    return placeholders, params
+
+
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -178,39 +185,59 @@ def verify_user(username: str, password: str):
 # ── Photos ────────────────────────────────────────────────────────────────────
 
 def insert_photo(user_id, original_filename, stored_filename,
-                 file_path, date_taken, exif_found, file_hash=None) -> int:
+                 file_path, date_taken, exif_found) -> int:
     return execute_write_returning("""
         INSERT INTO photos
-        (user_id, original_filename, stored_filename, file_path, date_taken, exif_found, file_hash)
-        VALUES (:uid, :orig, :stored, :path, :dt, :exif, :hash)
+        (user_id, original_filename, stored_filename, file_path, date_taken, exif_found)
+        VALUES (:uid, :orig, :stored, :path, :dt, :exif)
         RETURNING id
     """, {
         "uid": user_id, "orig": original_filename, "stored": stored_filename,
         "path": file_path,
         "dt": str(date_taken) if date_taken else None,
-        "exif": exif_found,
-        "hash": file_hash
+        "exif": exif_found
     })
 
 
-def get_all_photos(user_id):
+def get_all_photos(user_id, limit=50, offset=0):
     return execute("""
         SELECT * FROM photos WHERE user_id = :uid AND trashed = FALSE
-        ORDER BY date_taken DESC
+        ORDER BY date_taken DESC LIMIT :limit OFFSET :offset
+    """, {"uid": user_id, "limit": limit, "offset": offset})
+
+
+def count_all_photos(user_id):
+    rows = execute("""
+        SELECT COUNT(*) as c FROM photos WHERE user_id = :uid AND trashed = FALSE
     """, {"uid": user_id})
+    return rows[0]["c"]
 
 
-def get_photos_by_label(user_id, label):
+def get_photos_by_label(user_id, label, limit=50, offset=0):
     if label == "inbox":
         return execute("""
             SELECT * FROM photos WHERE user_id = :uid AND trashed = FALSE
             AND (label IS NULL OR label = '')
-            ORDER BY date_taken DESC
-        """, {"uid": user_id})
+            ORDER BY date_taken DESC LIMIT :limit OFFSET :offset
+        """, {"uid": user_id, "limit": limit, "offset": offset})
     return execute("""
         SELECT * FROM photos WHERE user_id = :uid AND trashed = FALSE
-        AND label = :label ORDER BY date_taken DESC
-    """, {"uid": user_id, "label": label})
+        AND label = :label ORDER BY date_taken DESC LIMIT :limit OFFSET :offset
+    """, {"uid": user_id, "label": label, "limit": limit, "offset": offset})
+
+
+def count_photos_by_label(user_id, label):
+    if label == "inbox":
+        rows = execute("""
+            SELECT COUNT(*) as c FROM photos WHERE user_id = :uid AND trashed = FALSE
+            AND (label IS NULL OR label = '')
+        """, {"uid": user_id})
+    else:
+        rows = execute("""
+            SELECT COUNT(*) as c FROM photos WHERE user_id = :uid AND trashed = FALSE
+            AND label = :label
+        """, {"uid": user_id, "label": label})
+    return rows[0]["c"]
 
 
 def get_photos_by_label_variety(user_id, label, variety):
@@ -293,20 +320,26 @@ def get_year_season_tree(user_id):
 
 
 def set_labels(photo_ids, label, user_id):
+    placeholders, params = _build_in_clause(photo_ids)
+    params['label'] = label
+    params['uid'] = user_id
     with engine.connect() as conn:
         result = conn.execute(
-            text(f"UPDATE photos SET label = :label WHERE id = ANY(:ids) AND user_id = :uid"),
-            {"label": label, "ids": photo_ids, "uid": user_id}
+            text(f"UPDATE photos SET label = :label WHERE id IN ({placeholders}) AND user_id = :uid"),
+            params
         )
         conn.commit()
         return result.rowcount
 
 
 def set_variety(photo_ids, variety, user_id):
+    placeholders, params = _build_in_clause(photo_ids)
+    params['variety'] = variety
+    params['uid'] = user_id
     with engine.connect() as conn:
         result = conn.execute(
-            text("UPDATE photos SET variety = :variety WHERE id = ANY(:ids) AND user_id = :uid"),
-            {"variety": variety, "ids": photo_ids, "uid": user_id}
+            text(f"UPDATE photos SET variety = :variety WHERE id IN ({placeholders}) AND user_id = :uid"),
+            params
         )
         conn.commit()
         return result.rowcount
@@ -352,35 +385,41 @@ def get_stats(user_id):
 # ── Trash ─────────────────────────────────────────────────────────────────────
 
 def trash_photos(photo_ids, user_id):
+    placeholders, params = _build_in_clause(photo_ids)
+    params['uid'] = user_id
     with engine.connect() as conn:
-        result = conn.execute(text("""
+        result = conn.execute(text(f"""
             UPDATE photos SET trashed = TRUE, trashed_at = CURRENT_TIMESTAMP
-            WHERE id = ANY(:ids) AND user_id = :uid
-        """), {"ids": photo_ids, "uid": user_id})
+            WHERE id IN ({placeholders}) AND user_id = :uid
+        """), params)
         conn.commit()
         return result.rowcount
 
 
 def restore_photos(photo_ids, user_id):
+    placeholders, params = _build_in_clause(photo_ids)
+    params['uid'] = user_id
     with engine.connect() as conn:
-        result = conn.execute(text("""
+        result = conn.execute(text(f"""
             UPDATE photos SET trashed = FALSE, trashed_at = NULL
-            WHERE id = ANY(:ids) AND user_id = :uid
-        """), {"ids": photo_ids, "uid": user_id})
+            WHERE id IN ({placeholders}) AND user_id = :uid
+        """), params)
         conn.commit()
         return result.rowcount
 
 
 def permanently_delete_photos(photo_ids, user_id):
-    rows = execute("""
-        SELECT file_path, season_copy_path, plant_copy_path FROM photos
-        WHERE id = ANY(:ids) AND user_id = :uid
-    """, {"ids": photo_ids, "uid": user_id})
-    paths = [(r["file_path"], r["season_copy_path"], r["plant_copy_path"])
+    placeholders, params = _build_in_clause(photo_ids)
+    params['uid'] = user_id
+    rows = execute(f"""
+        SELECT stored_filename, file_path, season_copy_path, plant_copy_path FROM photos
+        WHERE id IN ({placeholders}) AND user_id = :uid
+    """, params)
+    paths = [(r["stored_filename"], r["file_path"], r["season_copy_path"], r["plant_copy_path"])
              for r in rows]
     with engine.connect() as conn:
-        conn.execute(text("DELETE FROM photos WHERE id = ANY(:ids) AND user_id = :uid"),
-                     {"ids": photo_ids, "uid": user_id})
+        conn.execute(text(f"DELETE FROM upload_log WHERE photo_id IN ({placeholders})"), params)
+        conn.execute(text(f"DELETE FROM photos WHERE id IN ({placeholders}) AND user_id = :uid"), params)
         conn.commit()
     return paths
 
