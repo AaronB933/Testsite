@@ -4,12 +4,18 @@ from datetime import date, datetime
 from flask import Flask, request, jsonify, send_from_directory, session
 
 from database import (init_db, create_user, verify_user, insert_photo, log_action,
+                      init_tracker_tables,
                       get_all_photos, get_photos_by_label, get_photos_by_label_variety,
                       get_photos_by_year_season, get_photos_by_year,
                       get_all_labels, get_plant_tree, get_year_season_tree,
                       set_labels, set_variety, set_season, set_plant_copy_path,
                       get_stats, trash_photos, restore_photos,
-                      permanently_delete_photos, get_trashed_photos)
+                      permanently_delete_photos, get_trashed_photos,
+                      create_tracked_plant, update_tracked_plant, delete_tracked_plant,
+                      get_tracked_plants, get_tracked_plant, add_care_log, get_care_logs,
+                      delete_care_log, add_issue, update_issue, delete_issue, get_issues,
+                      add_tracker_photo, get_tracker_photos, delete_tracker_photo,
+                      get_type_presets, get_product_presets)
 from exifutils import (read_date_taken, write_date_to_exif, build_stored_filename,
                        get_existing_filenames, is_supported)
 
@@ -67,6 +73,12 @@ def upload_page():
     if not current_user():
         return send_from_directory("static", "login.html")
     return send_from_directory("static", "upload.html")
+
+@app.route("/tracker")
+def tracker_page():
+    if not current_user():
+        return send_from_directory("static", "login.html")
+    return send_from_directory("static", "tracker.html")
 
 @app.route("/organize")
 def organize_page():
@@ -445,22 +457,183 @@ def delete_permanent():
 def list_trash():
     return jsonify(get_trashed_photos(current_user()["id"]))
 
-@app.route("/api/open-folder/<folder_type>")
-@login_required
-def open_folder(folder_type):
-    user = current_user()
-    base = user_dir(user["id"])
-    if folder_type == "plants":
-        path = os.path.join(base, "plants")
-    elif folder_type == "seasons":
-        path = os.path.join(base)  # year folders live directly here
-    else:
-        return jsonify({"error": "Unknown folder"}), 400
 
-    os.makedirs(path, exist_ok=True)
-    os.startfile(path)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PLANT TRACKER ROUTES
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/tracker/plants", methods=["GET"])
+@login_required
+def tracker_list():
+    return jsonify(get_tracked_plants(current_user()["id"]))
+
+@app.route("/api/tracker/plants", methods=["POST"])
+@login_required
+def tracker_create():
+    d = request.get_json()
+    u = current_user()
+    pid = create_tracked_plant(
+        u["id"], d.get("name","").strip(),
+        d.get("plant_type",""), d.get("variety",""),
+        d.get("pot_size",""), d.get("location",""),
+        d.get("acquired_date") or None, d.get("notes","")
+    )
+    return jsonify({"success": True, "id": pid})
+
+@app.route("/api/tracker/plants/<int:plant_id>", methods=["GET"])
+@login_required
+def tracker_get(plant_id):
+    p = get_tracked_plant(plant_id, current_user()["id"])
+    if not p: return jsonify({"error": "Not found"}), 404
+    return jsonify(p)
+
+@app.route("/api/tracker/plants/<int:plant_id>", methods=["PUT"])
+@login_required
+def tracker_update(plant_id):
+    d = request.get_json()
+    u = current_user()
+    update_tracked_plant(
+        plant_id, u["id"], d.get("name","").strip(),
+        d.get("plant_type",""), d.get("variety",""),
+        d.get("pot_size",""), d.get("location",""),
+        d.get("acquired_date") or None, d.get("notes","")
+    )
     return jsonify({"success": True})
 
+@app.route("/api/tracker/plants/<int:plant_id>", methods=["DELETE"])
+@login_required
+def tracker_delete(plant_id):
+    delete_tracked_plant(plant_id, current_user()["id"])
+    return jsonify({"success": True})
+
+# Care logs
+@app.route("/api/tracker/plants/<int:plant_id>/care", methods=["GET"])
+@login_required
+def tracker_care_list(plant_id):
+    return jsonify(get_care_logs(plant_id, current_user()["id"]))
+
+@app.route("/api/tracker/plants/<int:plant_id>/care", methods=["POST"])
+@login_required
+def tracker_care_add(plant_id):
+    d = request.get_json()
+    u = current_user()
+    lid = add_care_log(
+        plant_id, u["id"],
+        d.get("care_type",""), d.get("care_date",""),
+        d.get("product",""), d.get("amount",""), d.get("notes","")
+    )
+    return jsonify({"success": True, "id": lid})
+
+@app.route("/api/tracker/care/<int:log_id>", methods=["DELETE"])
+@login_required
+def tracker_care_delete(log_id):
+    delete_care_log(log_id, current_user()["id"])
+    return jsonify({"success": True})
+
+# Issues
+@app.route("/api/tracker/plants/<int:plant_id>/issues", methods=["GET"])
+@login_required
+def tracker_issues_list(plant_id):
+    return jsonify(get_issues(plant_id, current_user()["id"]))
+
+@app.route("/api/tracker/plants/<int:plant_id>/issues", methods=["POST"])
+@login_required
+def tracker_issue_add(plant_id):
+    d = request.get_json()
+    u = current_user()
+    iid = add_issue(
+        plant_id, u["id"],
+        d.get("category",""), d.get("issue_name",""),
+        d.get("status","active"), d.get("first_seen") or None,
+        d.get("notes","")
+    )
+    return jsonify({"success": True, "id": iid})
+
+@app.route("/api/tracker/issues/<int:issue_id>", methods=["PUT"])
+@login_required
+def tracker_issue_update(issue_id):
+    d = request.get_json()
+    update_issue(issue_id, current_user()["id"],
+                 d.get("status","active"),
+                 d.get("resolved_date") or None,
+                 d.get("notes",""))
+    return jsonify({"success": True})
+
+@app.route("/api/tracker/issues/<int:issue_id>", methods=["DELETE"])
+@login_required
+def tracker_issue_delete(issue_id):
+    delete_issue(issue_id, current_user()["id"])
+    return jsonify({"success": True})
+
+# Photos
+@app.route("/api/tracker/plants/<int:plant_id>/photos", methods=["GET"])
+@login_required
+def tracker_photos_list(plant_id):
+    return jsonify(get_tracker_photos(plant_id, current_user()["id"]))
+
+@app.route("/api/tracker/plants/<int:plant_id>/photos", methods=["POST"])
+@login_required
+def tracker_photo_add(plant_id):
+    u = current_user()
+    # Upload new photo
+    if "file" in request.files:
+        file = request.files["file"]
+        caption = request.form.get("caption","")
+        taken_date = request.form.get("taken_date","") or None
+        original = os.path.basename(file.filename.replace("/",os.sep).replace("\\",os.sep))
+        ext = os.path.splitext(original)[1].lower()
+        tracker_dir = os.path.join(user_dir(u["id"]), "tracker", str(plant_id))
+        os.makedirs(tracker_dir, exist_ok=True)
+        stored = f"tp_{plant_id}_{original}"
+        counter = 2
+        base_s, ext_s = os.path.splitext(stored)
+        while os.path.exists(os.path.join(tracker_dir, stored)):
+            stored = f"{base_s}_{counter}{ext_s}"; counter += 1
+        file.save(os.path.join(tracker_dir, stored))
+        tid = add_tracker_photo(plant_id, u["id"], None,
+                                os.path.join(tracker_dir, stored),
+                                stored, caption, taken_date)
+        return jsonify({"success": True, "id": tid, "stored_filename": stored, "source": "tracker"})
+    # Link archive photo
+    d = request.get_json()
+    if d and d.get("archive_photo_id"):
+        from database import get_connection as _gc
+        conn2 = _gc(); cur2 = conn2.cursor()
+        cur2.execute("SELECT * FROM photos WHERE id=? AND user_id=?",
+                     (d["archive_photo_id"], u["id"]))
+        ap = cur2.fetchone(); conn2.close()
+        if not ap: return jsonify({"error":"Photo not found"}), 404
+        tid = add_tracker_photo(plant_id, u["id"], ap["id"],
+                                ap["file_path"], ap["stored_filename"],
+                                d.get("caption",""), ap["date_taken"])
+        return jsonify({"success": True, "id": tid})
+    return jsonify({"error": "No file or archive_photo_id"}), 400
+
+@app.route("/api/tracker/photos/<int:photo_id>", methods=["DELETE"])
+@login_required
+def tracker_photo_delete(photo_id):
+    row = delete_tracker_photo(photo_id, current_user()["id"])
+    return jsonify({"success": True})
+
+# Presets
+@app.route("/api/tracker/presets/types")
+@login_required
+def tracker_type_presets():
+    return jsonify(get_type_presets(current_user()["id"]))
+
+@app.route("/api/tracker/presets/products/<care_type>")
+@login_required
+def tracker_product_presets(care_type):
+    return jsonify(get_product_presets(current_user()["id"], care_type))
+
+# Serve tracker photos
+@app.route("/tracker-uploads/<path:filename>")
+def serve_tracker_upload(filename):
+    if not current_user():
+        return jsonify({"error": "Not logged in"}), 401
+    base = os.path.join(UPLOAD_BASE)
+    return send_from_directory(os.path.join(base), filename)
 
 # ── Serve files ─────────────────────────────────────────────────────────────────
 

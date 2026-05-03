@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plant Archive — Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --g50:#EAF3DE;--g100:#C0DD97;--g200:#97C459;--g600:#3B6D11;--g800:#27500A;--g900:#173404;
+    --a50:#FAEEDA;--a400:#BA7517;
+    --gray50:#F1EFE8;--gray100:#D3D1C7;--gray200:#B4B2A9;--gray600:#5F5E5A;--gray800:#444441;
+    --red50:#FFF0F0;--red600:#A32D2D;
+    --blue50:#EFF6FF;--blue600:#1D4ED8;
+  }
+  body{font-family:'DM Sans',sans-serif;background:#f7f5f0;color:var(--gray800);min-height:100vh;}
+
+  nav{background:var(--g900);display:flex;align-items:center;padding:0 2rem;height:60px;position:sticky;top:0;z-index:100;}
+  nav .brand{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:400;color:var(--g50);margin-right:2rem;}
+  nav .nav-links{display:flex;gap:.25rem;flex:1;}
+  nav a{color:rgba(234,243,222,.6);text-decoration:none;font-size:.875rem;font-weight:500;padding:.4rem .9rem;border-radius:8px;transition:background .15s,color .15s;}
+  nav a:hover,nav a.active{background:rgba(255,255,255,.12);color:var(--g50);}
+  nav .user-area{display:flex;align-items:center;gap:.75rem;margin-left:auto;}
+  nav .username{font-size:.8rem;color:rgba(234,243,222,.5);}
+  nav .logout-btn{background:rgba(255,255,255,.1);border:none;color:var(--g50);padding:.35rem .85rem;border-radius:8px;font-family:inherit;font-size:.8rem;cursor:pointer;}
+
+  #toast{position:fixed;bottom:2rem;right:2rem;padding:.7rem 1.2rem;border-radius:10px;font-size:.875rem;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;pointer-events:none;z-index:9999;max-width:340px;background:var(--g800);color:var(--g50);}
+  #toast.show{opacity:1;transform:translateY(0);}
+  #toast.toast-error{background:var(--red600);}
+  #toast.toast-warn{background:var(--a400);}
+  #toast.toast-info{background:var(--g600);}
+
+  /* Layout */
+  .layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 60px);}
+
+  /* ── Sidebar (plant list) ── */
+  .sidebar{background:white;border-right:1px solid var(--gray100);display:flex;flex-direction:column;}
+  .sb-header{padding:1rem 1rem .75rem;border-bottom:1px solid var(--gray100);display:flex;align-items:center;justify-content:space-between;}
+  .sb-header h2{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:400;}
+  .btn-add-plant{background:var(--g800);color:var(--g50);border:none;border-radius:8px;padding:.4rem .85rem;font-family:inherit;font-size:.82rem;font-weight:500;cursor:pointer;}
+  .btn-add-plant:hover{background:var(--g900);}
+
+  .sb-search{padding:.6rem 1rem;border-bottom:1px solid var(--gray100);}
+  .sb-search input{width:100%;padding:.4rem .7rem;border:1px solid var(--gray100);border-radius:8px;font-family:inherit;font-size:.85rem;background:var(--gray50);outline:none;}
+  .sb-search input:focus{border-color:var(--g200);background:white;}
+
+  .plant-list{flex:1;overflow-y:auto;}
+  .plant-row{display:flex;align-items:center;padding:.75rem 1rem;cursor:pointer;border-bottom:1px solid var(--gray50);transition:background .12s;gap:.75rem;}
+  .plant-row:hover{background:var(--g50);}
+  .plant-row.active{background:var(--g50);border-left:3px solid var(--g600);}
+  .plant-row .pr-icon{width:36px;height:36px;border-radius:10px;background:var(--g50);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;}
+  .plant-row.active .pr-icon{background:var(--g100);}
+  .plant-row .pr-info{flex:1;min-width:0;}
+  .plant-row .pr-name{font-size:.9rem;font-weight:500;text-transform:capitalize;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .plant-row .pr-sub{font-size:.72rem;color:var(--gray200);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .plant-row .pr-badges{display:flex;gap:.3rem;flex-shrink:0;}
+  .issue-dot{width:8px;height:8px;border-radius:50%;background:#E53E3E;}
+  .pr-pot{font-size:.68rem;color:var(--gray200);background:var(--gray50);padding:1px 6px;border-radius:10px;}
+
+  .empty-list{text-align:center;padding:3rem 1rem;color:var(--gray200);}
+  .empty-list .icon{font-size:2rem;margin-bottom:.5rem;}
+  .empty-list p{font-size:.82rem;}
+
+  /* ── Detail panel ── */
+  .detail{overflow-y:auto;background:#f7f5f0;}
+  .detail-empty{display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:.75rem;color:var(--gray200);}
+  .detail-empty .icon{font-size:3rem;}
+  .detail-empty p{font-size:.9rem;}
+
+  .detail-inner{padding:2rem;max-width:860px;}
+
+  /* Plant header */
+  .plant-header{background:white;border-radius:16px;padding:1.5rem;margin-bottom:1.25rem;border:1px solid var(--gray100);}
+  .ph-top{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1rem;}
+  .ph-title{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:400;text-transform:capitalize;}
+  .ph-sub{font-size:.85rem;color:var(--gray200);margin-top:.25rem;}
+  .ph-actions{display:flex;gap:.5rem;flex-shrink:0;}
+  .ph-info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem;}
+  .info-chip{background:var(--gray50);border-radius:10px;padding:.6rem .8rem;}
+  .info-chip .ic-label{font-size:.65rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--gray200);margin-bottom:.2rem;}
+  .info-chip .ic-value{font-size:.85rem;font-weight:500;color:var(--gray800);}
+  .info-chip .ic-value.good{color:var(--g600);}
+  .info-chip .ic-value.warn{color:var(--a400);}
+  .info-chip .ic-value.bad{color:var(--red600);}
+
+  /* Section card */
+  .section-card{background:white;border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;border:1px solid var(--gray100);}
+  .sc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+  .sc-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:400;}
+  .btn-sm{padding:.35rem .8rem;border-radius:7px;font-family:inherit;font-size:.78rem;font-weight:500;cursor:pointer;border:none;transition:background .15s;}
+  .btn-sm-green{background:var(--g800);color:var(--g50);}
+  .btn-sm-green:hover{background:var(--g900);}
+  .btn-sm-ghost{background:var(--gray50);color:var(--gray600);border:1px solid var(--gray100);}
+  .btn-sm-red{background:var(--red50);color:var(--red600);border:1px solid #FECACA;}
+
+  /* Care log table */
+  .care-table{width:100%;border-collapse:collapse;}
+  .care-table th{font-size:.7rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--gray200);padding:.4rem .6rem;text-align:left;border-bottom:1px solid var(--gray100);}
+  .care-table td{padding:.55rem .6rem;font-size:.85rem;border-bottom:1px solid var(--gray50);}
+  .care-table tr:last-child td{border-bottom:none;}
+  .care-badge{display:inline-block;font-size:.68rem;font-weight:600;padding:2px 7px;border-radius:10px;text-transform:capitalize;}
+  .cb-watered{background:#DBEAFE;color:#1E40AF;}
+  .cb-fertilized{background:#D1FAE5;color:#065F46;}
+  .cb-sprayed{background:#FEF3C7;color:#92400E;}
+
+  /* Issues */
+  .issue-item{display:flex;align-items:flex-start;gap:.75rem;padding:.65rem;border-radius:10px;border:1px solid var(--gray100);margin-bottom:.5rem;}
+  .issue-item.active-issue{border-color:#FCA5A5;background:var(--red50);}
+  .issue-item.resolved-issue{background:var(--gray50);opacity:.75;}
+  .issue-icon{font-size:1.2rem;margin-top:2px;}
+  .issue-info{flex:1;}
+  .issue-name{font-size:.875rem;font-weight:500;text-transform:capitalize;}
+  .issue-meta{font-size:.72rem;color:var(--gray200);margin-top:2px;}
+  .issue-notes{font-size:.78rem;color:var(--gray600);margin-top:.3rem;font-style:italic;}
+  .issue-actions{display:flex;gap:.35rem;flex-shrink:0;}
+  .status-badge{display:inline-block;font-size:.65rem;font-weight:600;padding:2px 7px;border-radius:10px;text-transform:capitalize;}
+  .sb-active{background:#FEE2E2;color:#B91C1C;}
+  .sb-resolved{background:#D1FAE5;color:#065F46;}
+
+  /* Photos */
+  .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.6rem;}
+  .tp-card{border-radius:10px;overflow:hidden;border:1px solid var(--gray100);position:relative;cursor:pointer;background:white;}
+  .tp-card img{width:100%;aspect-ratio:1;object-fit:cover;display:block;}
+  .tp-card .tp-caption{font-size:.68rem;color:var(--gray600);padding:.3rem .4rem;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tp-card .tp-del{display:none;position:absolute;top:4px;right:4px;background:rgba(163,45,45,.85);color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:.7rem;cursor:pointer;align-items:center;justify-content:center;}
+  .tp-card:hover .tp-del{display:flex;}
+
+  /* Notes section */
+  .notes-text{font-size:.875rem;color:var(--gray600);line-height:1.6;white-space:pre-wrap;}
+  .notes-empty{color:var(--gray200);font-size:.82rem;font-style:italic;}
+
+  /* ── Modals ── */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center;padding:1rem;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:white;border-radius:18px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:1.75rem;}
+  .modal h3{font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:400;margin-bottom:1.25rem;color:var(--g800);}
+  .form-row{margin-bottom:.9rem;}
+  .form-row label{display:block;font-size:.78rem;font-weight:500;color:var(--gray600);margin-bottom:.3rem;}
+  .form-row input,.form-row select,.form-row textarea{width:100%;padding:.5rem .75rem;border:1px solid var(--gray100);border-radius:9px;font-family:inherit;font-size:.875rem;color:var(--gray800);background:var(--gray50);outline:none;transition:border-color .15s;}
+  .form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--g200);background:white;}
+  .form-row textarea{resize:vertical;min-height:70px;}
+  .form-row .hint{font-size:.7rem;color:var(--gray200);margin-top:.25rem;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;}
+  .modal-actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--gray100);}
+  .btn-modal-ok{padding:.55rem 1.25rem;background:var(--g800);color:var(--g50);border:none;border-radius:9px;font-family:inherit;font-size:.9rem;font-weight:500;cursor:pointer;}
+  .btn-modal-ok:hover{background:var(--g900);}
+  .btn-modal-cancel{padding:.55rem 1rem;background:var(--gray50);color:var(--gray600);border:1px solid var(--gray100);border-radius:9px;font-family:inherit;font-size:.9rem;cursor:pointer;}
+
+  /* Datalist styling helper */
+  .datalist-wrap{position:relative;}
+
+  /* Lightbox */
+  #lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:3000;align-items:center;justify-content:center;}
+  #lightbox.show{display:flex;}
+  #lightbox img{max-width:92vw;max-height:88vh;object-fit:contain;border-radius:8px;}
+  .lb-close{position:absolute;top:1.25rem;right:1.5rem;background:rgba(255,255,255,.12);border:none;color:white;width:38px;height:38px;border-radius:50%;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+
+  /* Upload zone in modal */
+  .upload-zone-sm{border:2px dashed var(--gray100);border-radius:10px;padding:1.25rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
+  .upload-zone-sm:hover,.upload-zone-sm.dragover{border-color:var(--g600);background:var(--g50);}
+  .upload-zone-sm p{font-size:.82rem;color:var(--gray200);}
+
+  /* Archive photo picker */
+  .archive-picker{max-height:200px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:.4rem;margin-top:.5rem;}
+  .ap-thumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:border-color .15s;}
+  .ap-thumb:hover,.ap-thumb.selected{border-color:var(--g600);}
+
+  .tab-bar{display:flex;gap:.25rem;background:var(--gray50);border-radius:10px;padding:3px;margin-bottom:1rem;}
+  .tab-btn{flex:1;padding:.4rem;text-align:center;border-radius:7px;font-size:.82rem;font-weight:500;cursor:pointer;color:var(--gray600);border:none;background:none;font-family:inherit;transition:background .15s;}
+  .tab-btn.active{background:white;color:var(--gray800);}
+</style>
+
+<nav>
+  <span class="brand">🌿 Plant Archive</span>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/upload">Upload</a>
+    <a href="/organize">Organize</a>
+    <a href="/tracker" class="active">Plant Tracker</a>
+  </div>
+  <div class="user-area">
+    <span class="username" id="nav-username"></span>
+    <button class="logout-btn" onclick="doLogout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- Plant list sidebar -->
+  <aside class="sidebar">
+    <div class="sb-header">
+      <h2>🌱 My Plants</h2>
+      <button class="btn-add-plant" onclick="openPlantModal()">+ Add Plant</button>
+    </div>
+    <div class="sb-search">
+      <input type="text" id="plant-search" placeholder="Search plants..." oninput="filterPlants()" />
+    </div>
+    <div class="plant-list" id="plant-list">
+      <div class="empty-list"><div class="icon">🪴</div><p>No plants yet<br>Click + Add Plant to start</p></div>
+    </div>
+  </aside>
+
+  <!-- Detail panel -->
+  <div class="detail" id="detail">
+    <div class="detail-empty">
+      <div class="icon">🌿</div>
+      <p>Select a plant to view details</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add/Edit Plant Modal ── -->
+<div class="modal-overlay" id="plant-modal">
+  <div class="modal">
+    <h3 id="plant-modal-title">Add Plant</h3>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Plant Name <span style="color:var(--red600)">*</span></label>
+        <input type="text" id="pm-name" placeholder="e.g. My Big Tulip" />
+      </div>
+      <div class="form-row">
+        <label>Pot Size</label>
+        <select id="pm-pot">
+          <option value="">— Select —</option>
+          <option>4"</option><option>6"</option><option>8"</option>
+          <option>10"</option><option>12"</option><option>14"</option>
+          <option>16"+</option><option>Custom</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Plant Type</label>
+        <div class="datalist-wrap">
+          <input type="text" id="pm-type" list="type-presets" placeholder="e.g. Tulip, Rose..." />
+          <datalist id="type-presets"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Variety</label>
+        <input type="text" id="pm-variety" placeholder="e.g. Hakuun, Queen of Night" />
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Location</label>
+        <input type="text" id="pm-location" placeholder="e.g. Greenhouse, Windowsill" />
+      </div>
+      <div class="form-row">
+        <label>Date Acquired</label>
+        <input type="date" id="pm-acquired" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Notes</label>
+      <textarea id="pm-notes" placeholder="Any additional notes..."></textarea>
+    </div>
+    <input type="hidden" id="pm-id" value="" />
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closePlantModal()">Cancel</button>
+      <button class="btn-modal-ok" onclick="savePlant()">Save Plant</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Care Log Modal ── -->
+<div class="modal-overlay" id="care-modal">
+  <div class="modal">
+    <h3>Log Care Event</h3>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Type <span style="color:var(--red600)">*</span></label>
+        <select id="cm-type" onchange="loadProductPresets()">
+          <option value="watered">💧 Watered</option>
+          <option value="fertilized">🌿 Fertilized</option>
+          <option value="sprayed">💨 Sprayed</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Date <span style="color:var(--red600)">*</span></label>
+        <input type="date" id="cm-date" />
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Product Used</label>
+        <div class="datalist-wrap">
+          <input type="text" id="cm-product" list="product-presets" placeholder="e.g. Miracle-Gro, Neem Oil..." />
+          <datalist id="product-presets"></datalist>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Amount</label>
+        <input type="text" id="cm-amount" placeholder="e.g. 2 tsp, 1L" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Notes</label>
+      <textarea id="cm-notes" placeholder="Any observations..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeCareModal()">Cancel</button>
+      <button class="btn-modal-ok" onclick="saveCare()">Log Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Issue Modal ── -->
+<div class="modal-overlay" id="issue-modal">
+  <div class="modal">
+    <h3 id="issue-modal-title">Add Issue</h3>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Category <span style="color:var(--red600)">*</span></label>
+        <select id="im-category" onchange="updateIssueNames()">
+          <option value="bug">🐛 Bug / Pest</option>
+          <option value="disease">🍄 Disease</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>Issue <span style="color:var(--red600)">*</span></label>
+        <div class="datalist-wrap">
+          <input type="text" id="im-name" list="issue-presets" placeholder="Select or type..." />
+          <datalist id="issue-presets"></datalist>
+        </div>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Status</label>
+        <select id="im-status">
+          <option value="active">🔴 Active</option>
+          <option value="resolved">✅ Resolved</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>First Seen</label>
+        <input type="date" id="im-date" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Notes</label>
+      <textarea id="im-notes" placeholder="Treatment used, observations..."></textarea>
+    </div>
+    <input type="hidden" id="im-id" value="" />
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeIssueModal()">Cancel</button>
+      <button class="btn-modal-ok" onclick="saveIssue()">Save Issue</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Photo Modal ── -->
+<div class="modal-overlay" id="photo-modal">
+  <div class="modal">
+    <h3>Add Photo</h3>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchPhotoTab('upload',this)">📤 Upload New</button>
+      <button class="tab-btn" onclick="switchPhotoTab('archive',this)">🗂 From Archive</button>
+    </div>
+
+    <div id="photo-tab-upload">
+      <div class="upload-zone-sm" id="photo-drop-zone" onclick="document.getElementById('photo-file-input').click()">
+        <p>📷 Click or drop a photo here</p>
+        <input type="file" id="photo-file-input" style="display:none" accept=".jpg,.jpeg,.png,.heic,.heif" onchange="handlePhotoFile(this.files[0])" />
+      </div>
+      <div id="photo-preview" style="margin-top:.75rem;display:none;">
+        <img id="photo-preview-img" style="max-width:100%;max-height:150px;border-radius:8px;object-fit:contain;" />
+      </div>
+    </div>
+
+    <div id="photo-tab-archive" style="display:none;">
+      <p style="font-size:.8rem;color:var(--gray200);margin-bottom:.5rem;">Click a photo from your archive to link it:</p>
+      <div class="archive-picker" id="archive-picker"></div>
+    </div>
+
+    <div class="form-row" style="margin-top:.75rem;">
+      <label>Caption (optional)</label>
+      <input type="text" id="phm-caption" placeholder="e.g. First bloom of the season" />
+    </div>
+    <div class="form-row">
+      <label>Date Taken (optional)</label>
+      <input type="date" id="phm-date" />
+    </div>
+    <input type="hidden" id="phm-archive-id" value="" />
+    <input type="hidden" id="phm-file-obj" value="" />
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closePhotoModal()">Cancel</button>
+      <button class="btn-modal-ok" onclick="savePhoto()">Add Photo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <img id="lb-img" src="" />
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const BUG_PRESETS = ['Thrips','Aphids','Spider Mites','Fungus Gnats','Whitefly','Mealybugs','Scale','Caterpillars','Leafminers'];
+  const DISEASE_PRESETS = ['Powdery Mildew','Botrytis (Gray Mold)','Root Rot','Downy Mildew','Leaf Spot','Fusarium Wilt','Rust','Damping Off'];
+  const POT_SIZES = ['4"','6"','8"','10"','12"','14"','16"+'];
+
+  let allPlants = [], currentPlantId = null, selectedArchiveId = null, pendingPhotoFile = null;
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  async function init() {
+    const res = await fetch('/api/me');
+    if (res.status === 401) { window.location.href = '/'; return; }
+    const user = await res.json();
+    window._userId = user.id;
+    document.getElementById('nav-username').textContent = user.username;
+    await loadPlants();
+    loadTypePresets();
+  }
+
+  // ── Plant list ────────────────────────────────────────────────────────────
+  async function loadPlants() {
+    allPlants = await fetch('/api/tracker/plants').then(r => r.json());
+    renderPlantList(allPlants);
+  }
+
+  function renderPlantList(plants) {
+    const list = document.getElementById('plant-list');
+    if (!plants.length) {
+      list.innerHTML = `<div class="empty-list"><div class="icon">🪴</div><p>No plants yet<br>Click + Add Plant to start</p></div>`;
+      return;
+    }
+    list.innerHTML = plants.map(p => {
+      const sub = [p.plant_type, p.variety].filter(Boolean).join(' · ');
+      const issuesDot = p.active_issues > 0 ? `<div class="issue-dot" title="${p.active_issues} active issue${p.active_issues>1?'s':''}"></div>` : '';
+      const potBadge = p.pot_size ? `<span class="pr-pot">${p.pot_size}</span>` : '';
+      return `
+        <div class="plant-row ${p.id === currentPlantId ? 'active' : ''}" onclick="selectPlant(${p.id})">
+          <div class="pr-icon">🪴</div>
+          <div class="pr-info">
+            <div class="pr-name">${p.name}</div>
+            <div class="pr-sub">${sub || 'No type set'}</div>
+          </div>
+          <div class="pr-badges">${issuesDot}${potBadge}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function filterPlants() {
+    const q = document.getElementById('plant-search').value.toLowerCase();
+    renderPlantList(allPlants.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      (p.plant_type||'').toLowerCase().includes(q) ||
+      (p.variety||'').toLowerCase().includes(q)
+    ));
+  }
+
+  // ── Select plant ──────────────────────────────────────────────────────────
+  async function selectPlant(id) {
+    currentPlantId = id;
+    renderPlantList(allPlants);
+    await loadDetail(id);
+  }
+
+  async function loadDetail(id) {
+    const [plant, care, issues, photos] = await Promise.all([
+      fetch(`/api/tracker/plants/${id}`).then(r => r.json()),
+      fetch(`/api/tracker/plants/${id}/care`).then(r => r.json()),
+      fetch(`/api/tracker/plants/${id}/issues`).then(r => r.json()),
+      fetch(`/api/tracker/plants/${id}/photos`).then(r => r.json())
+    ]);
+    renderDetail(plant, care, issues, photos);
+  }
+
+  function renderDetail(plant, care, issues, photos) {
+    const p = plant;
+    const bugs = issues.filter(i => i.category === 'bug');
+    const diseases = issues.filter(i => i.category === 'disease');
+    const activeIssues = issues.filter(i => i.status === 'active').length;
+
+    // Last care dates
+    const lastWatered = care.find(c => c.care_type === 'watered');
+    const lastFertilized = care.find(c => c.care_type === 'fertilized');
+    const lastSprayed = care.find(c => c.care_type === 'sprayed');
+
+    function daysSince(d) {
+      if (!d) return null;
+      const diff = Math.floor((Date.now() - new Date(d+'T00:00:00')) / 86400000);
+      return diff;
+    }
+
+    function daysLabel(d, warnAt, badAt) {
+      if (!d) return { text: 'Never', cls: 'bad' };
+      const days = daysSince(d);
+      const cls = days >= badAt ? 'bad' : days >= warnAt ? 'warn' : 'good';
+      return { text: days === 0 ? 'Today' : `${days}d ago`, cls };
+    }
+
+    const wl = daysLabel(lastWatered?.care_date, 5, 10);
+    const fl = daysLabel(lastFertilized?.care_date, 14, 30);
+    const sl = daysLabel(lastSprayed?.care_date, 14, 30);
+
+    document.getElementById('detail').innerHTML = `
+      <div class="detail-inner">
+
+        <!-- Header -->
+        <div class="plant-header">
+          <div class="ph-top">
+            <div>
+              <div class="ph-title">${p.name}</div>
+              <div class="ph-sub">${[p.plant_type, p.variety].filter(Boolean).join(' · ') || 'No type set'}
+                ${p.location ? ' · 📍 ' + p.location : ''}</div>
+            </div>
+            <div class="ph-actions">
+              <button class="btn-sm btn-sm-ghost" onclick="openPlantModal(${p.id})">✏️ Edit</button>
+              <button class="btn-sm btn-sm-red" onclick="confirmDeletePlant(${p.id})">🗑</button>
+            </div>
+          </div>
+          <div class="ph-info-grid">
+            <div class="info-chip">
+              <div class="ic-label">Pot Size</div>
+              <div class="ic-value">${p.pot_size || '—'}</div>
+            </div>
+            <div class="info-chip">
+              <div class="ic-label">Acquired</div>
+              <div class="ic-value">${p.acquired_date ? fmtDate(p.acquired_date) : '—'}</div>
+            </div>
+            <div class="info-chip">
+              <div class="ic-label">💧 Last Watered</div>
+              <div class="ic-value ${wl.cls}">${wl.text}</div>
+            </div>
+            <div class="info-chip">
+              <div class="ic-label">🌿 Last Fertilized</div>
+              <div class="ic-value ${fl.cls}">${fl.text}</div>
+            </div>
+            <div class="info-chip">
+              <div class="ic-label">💨 Last Sprayed</div>
+              <div class="ic-value ${sl.cls}">${sl.text}</div>
+            </div>
+            <div class="info-chip">
+              <div class="ic-label">⚠ Active Issues</div>
+              <div class="ic-value ${activeIssues > 0 ? 'bad' : 'good'}">${activeIssues || 'None'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Care log -->
+        <div class="section-card">
+          <div class="sc-header">
+            <div class="sc-title">Care History</div>
+            <button class="btn-sm btn-sm-green" onclick="openCareModal(${p.id})">+ Log Event</button>
+          </div>
+          ${care.length ? `
+          <table class="care-table">
+            <thead><tr>
+              <th>Type</th><th>Date</th><th>Product</th><th>Amount</th><th>Notes</th><th></th>
+            </tr></thead>
+            <tbody>${care.map(c => `
+              <tr>
+                <td><span class="care-badge cb-${c.care_type}">${c.care_type}</span></td>
+                <td>${fmtDate(c.care_date)}</td>
+                <td>${c.product || '—'}</td>
+                <td>${c.amount || '—'}</td>
+                <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.notes || '—'}</td>
+                <td><button class="btn-sm btn-sm-red" onclick="deleteCare(${c.id})">✕</button></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>` : `<p style="font-size:.82rem;color:var(--gray200);">No care events logged yet.</p>`}
+        </div>
+
+        <!-- Bug issues -->
+        <div class="section-card">
+          <div class="sc-header">
+            <div class="sc-title">🐛 Bug / Pest Issues</div>
+            <button class="btn-sm btn-sm-green" onclick="openIssueModal(${p.id},'bug')">+ Add Issue</button>
+          </div>
+          ${bugs.length ? bugs.map(i => renderIssue(i)).join('') : `<p style="font-size:.82rem;color:var(--gray200);">No bug issues recorded.</p>`}
+        </div>
+
+        <!-- Disease issues -->
+        <div class="section-card">
+          <div class="sc-header">
+            <div class="sc-title">🍄 Disease Issues</div>
+            <button class="btn-sm btn-sm-green" onclick="openIssueModal(${p.id},'disease')">+ Add Issue</button>
+          </div>
+          ${diseases.length ? diseases.map(i => renderIssue(i)).join('') : `<p style="font-size:.82rem;color:var(--gray200);">No disease issues recorded.</p>`}
+        </div>
+
+        <!-- Photos -->
+        <div class="section-card">
+          <div class="sc-header">
+            <div class="sc-title">📷 Photos (${photos.length})</div>
+            <button class="btn-sm btn-sm-green" onclick="openPhotoModal(${p.id})">+ Add Photo</button>
+          </div>
+          ${photos.length ? `<div class="photo-grid">${photos.map(ph => {
+            const src = ph.archive_photo_id
+              ? `/uploads/user_${window._userId}/inbox/${ph.stored_filename}`
+              : `/uploads/user_${window._userId}/tracker/${p.id}/${ph.stored_filename}`;
+            return `<div class="tp-card" onclick="openLightbox('${src}')">
+              <button class="tp-del" onclick="event.stopPropagation();deleteTrackerPhoto(${ph.id})">✕</button>
+              <img src="${src}" loading="lazy" onerror="this.style.background='#EAF3DE'">
+              <div class="tp-caption">${ph.caption || fmtDate(ph.taken_date) || '—'}</div>
+            </div>`;
+          }).join('')}</div>` : `<p style="font-size:.82rem;color:var(--gray200);">No photos yet.</p>`}
+        </div>
+
+        <!-- Notes -->
+        <div class="section-card">
+          <div class="sc-header">
+            <div class="sc-title">📝 Notes</div>
+            <button class="btn-sm btn-sm-ghost" onclick="openPlantModal(${p.id})">Edit</button>
+          </div>
+          ${p.notes ? `<div class="notes-text">${escHtml(p.notes)}</div>` : `<p class="notes-empty">No notes added.</p>`}
+        </div>
+
+      </div>`;
+  }
+
+  function renderIssue(i) {
+    const icon = i.category === 'bug' ? '🐛' : '🍄';
+    const cls = i.status === 'active' ? 'active-issue' : 'resolved-issue';
+    const statusBadge = `<span class="status-badge ${i.status === 'active' ? 'sb-active' : 'sb-resolved'}">${i.status}</span>`;
+    const resolveBtn = i.status === 'active'
+      ? `<button class="btn-sm btn-sm-ghost" onclick="resolveIssue(${i.id})">✅ Resolve</button>`
+      : '';
+    return `
+      <div class="issue-item ${cls}">
+        <div class="issue-icon">${icon}</div>
+        <div class="issue-info">
+          <div class="issue-name">${i.issue_name} ${statusBadge}</div>
+          <div class="issue-meta">${i.first_seen ? 'First seen: ' + fmtDate(i.first_seen) : ''}${i.resolved_date ? ' · Resolved: ' + fmtDate(i.resolved_date) : ''}</div>
+          ${i.notes ? `<div class="issue-notes">${escHtml(i.notes)}</div>` : ''}
+        </div>
+        <div class="issue-actions">
+          ${resolveBtn}
+          <button class="btn-sm btn-sm-red" onclick="deleteIssue(${i.id})">✕</button>
+        </div>
+      </div>`;
+  }
+
+  // ── Plant modal ───────────────────────────────────────────────────────────
+  async function openPlantModal(plantId = null) {
+    document.getElementById('pm-id').value = plantId || '';
+    document.getElementById('plant-modal-title').textContent = plantId ? 'Edit Plant' : 'Add Plant';
+    if (plantId) {
+      const p = await fetch(`/api/tracker/plants/${plantId}`).then(r => r.json());
+      document.getElementById('pm-name').value = p.name || '';
+      document.getElementById('pm-pot').value = p.pot_size || '';
+      document.getElementById('pm-type').value = p.plant_type || '';
+      document.getElementById('pm-variety').value = p.variety || '';
+      document.getElementById('pm-location').value = p.location || '';
+      document.getElementById('pm-acquired').value = p.acquired_date || '';
+      document.getElementById('pm-notes').value = p.notes || '';
+    } else {
+      ['pm-name','pm-type','pm-variety','pm-location','pm-notes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('pm-pot').value = '';
+      document.getElementById('pm-acquired').value = '';
+    }
+    document.getElementById('plant-modal').classList.add('show');
+    setTimeout(() => document.getElementById('pm-name').focus(), 50);
+  }
+
+  function closePlantModal() { document.getElementById('plant-modal').classList.remove('show'); }
+
+  async function savePlant() {
+    const name = document.getElementById('pm-name').value.trim();
+    if (!name) { showToast('Plant name is required', 'warn'); return; }
+    const id = document.getElementById('pm-id').value;
+    const body = {
+      name,
+      plant_type: document.getElementById('pm-type').value.trim(),
+      variety: document.getElementById('pm-variety').value.trim(),
+      pot_size: document.getElementById('pm-pot').value,
+      location: document.getElementById('pm-location').value.trim(),
+      acquired_date: document.getElementById('pm-acquired').value || null,
+      notes: document.getElementById('pm-notes').value.trim()
+    };
+    const url = id ? `/api/tracker/plants/${id}` : '/api/tracker/plants';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (data.success) {
+      closePlantModal();
+      showToast(id ? 'Plant updated' : 'Plant added');
+      await loadPlants();
+      loadTypePresets();
+      if (!id && data.id) { currentPlantId = data.id; renderPlantList(allPlants); await loadDetail(data.id); }
+      else if (id) await loadDetail(parseInt(id));
+    } else showToast(data.error || 'Failed', 'error');
+  }
+
+  async function confirmDeletePlant(id) {
+    if (!confirm('Delete this plant and all its care logs, issues, and photos?')) return;
+    await fetch(`/api/tracker/plants/${id}`, { method: 'DELETE' });
+    showToast('Plant deleted');
+    currentPlantId = null;
+    document.getElementById('detail').innerHTML = `<div class="detail-empty"><div class="icon">🌿</div><p>Select a plant to view details</p></div>`;
+    await loadPlants();
+  }
+
+  // ── Care modal ────────────────────────────────────────────────────────────
+  let carePlantId = null;
+function openCareModal(plantId) {
+    carePlantId = plantId;
+    // Only set date if empty
+    if (!document.getElementById('cm-date').value) {
+      document.getElementById('cm-date').value = new Date().toISOString().split('T')[0];
+    }
+    loadProductPresets();
+    document.getElementById('care-modal').classList.add('show');
+  }
+  function closeCareModal() { document.getElementById('care-modal').classList.remove('show'); }
+
+  async function loadProductPresets() {
+    const type = document.getElementById('cm-type').value;
+    const presets = await fetch(`/api/tracker/presets/products/${type}`).then(r => r.json());
+    document.getElementById('product-presets').innerHTML = presets.map(p => `<option value="${escHtml(p)}">`).join('');
+  }
+
+  async function saveCare() {
+    const care_type = document.getElementById('cm-type').value;
+    const care_date = document.getElementById('cm-date').value;
+    if (!care_date) { showToast('Date is required', 'warn'); return; }
+    const body = {
+      care_type, care_date,
+      product: document.getElementById('cm-product').value.trim(),
+      amount: document.getElementById('cm-amount').value.trim(),
+      notes: document.getElementById('cm-notes').value.trim()
+    };
+    const res = await fetch(`/api/tracker/plants/${carePlantId}/care`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeCareModal();
+      showToast(`${care_type} logged`);
+      await loadPlants();
+      await loadDetail(carePlantId);
+    } else showToast(data.error || 'Failed', 'error');
+  }
+
+  async function deleteCare(id) {
+    await fetch(`/api/tracker/care/${id}`, { method: 'DELETE' });
+    showToast('Entry removed');
+    await loadPlants();
+    await loadDetail(currentPlantId);
+  }
+
+  // ── Issue modal ───────────────────────────────────────────────────────────
+  let issuePlantId = null;
+  function openIssueModal(plantId, category = 'bug') {
+    issuePlantId = plantId;
+    document.getElementById('im-id').value = '';
+    document.getElementById('im-issue-modal-title');
+    document.getElementById('im-category').value = category;
+    document.getElementById('im-name').value = '';
+    document.getElementById('im-status').value = 'active';
+    document.getElementById('im-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('im-notes').value = '';
+    updateIssueNames();
+    document.getElementById('issue-modal').classList.add('show');
+  }
+  function closeIssueModal() { document.getElementById('issue-modal').classList.remove('show'); }
+
+  function updateIssueNames() {
+    const cat = document.getElementById('im-category').value;
+    const presets = cat === 'bug' ? BUG_PRESETS : DISEASE_PRESETS;
+    document.getElementById('issue-presets').innerHTML = presets.map(p => `<option value="${p}">`).join('');
+  }
+
+  async function saveIssue() {
+    const name = document.getElementById('im-name').value.trim();
+    if (!name) { showToast('Issue name required', 'warn'); return; }
+    const body = {
+      category: document.getElementById('im-category').value,
+      issue_name: name,
+      status: document.getElementById('im-status').value,
+      first_seen: document.getElementById('im-date').value || null,
+      notes: document.getElementById('im-notes').value.trim()
+    };
+    const res = await fetch(`/api/tracker/plants/${issuePlantId}/issues`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (data.success) {
+      closeIssueModal(); showToast('Issue added');
+      await loadPlants(); await loadDetail(issuePlantId);
+    } else showToast(data.error || 'Failed', 'error');
+  }
+
+  async function resolveIssue(id) {
+    const today = new Date().toISOString().split('T')[0];
+    await fetch(`/api/tracker/issues/${id}`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ status: 'resolved', resolved_date: today, notes: '' })
+    });
+    showToast('Issue marked resolved');
+    await loadPlants(); await loadDetail(currentPlantId);
+  }
+
+  async function deleteIssue(id) {
+    await fetch(`/api/tracker/issues/${id}`, { method: 'DELETE' });
+    showToast('Issue removed');
+    await loadPlants(); await loadDetail(currentPlantId);
+  }
+
+  // ── Photo modal ───────────────────────────────────────────────────────────
+  let photoPlantId = null;
+  async function openPhotoModal(plantId) {
+    photoPlantId = plantId;
+    selectedArchiveId = null; pendingPhotoFile = null;
+    document.getElementById('phm-caption').value = '';
+    document.getElementById('phm-date').value = '';
+    document.getElementById('phm-archive-id').value = '';
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('photo-file-input').value = '';
+    switchPhotoTab('upload', document.querySelector('.tab-btn'));
+
+    // Load archive photos for picker
+    const archivePhotos = await fetch('/api/photos').then(r => r.json());
+    document.getElementById('archive-picker').innerHTML = archivePhotos.slice(0, 60).map(p => `
+      <img class="ap-thumb" src="/uploads/user_${window._userId}/inbox/${p.stored_filename}"
+           data-id="${p.id}" loading="lazy"
+           onclick="selectArchivePhoto(${p.id}, this)"
+           onerror="this.style.display='none'">`).join('');
+
+    document.getElementById('photo-modal').classList.add('show');
+  }
+  function closePhotoModal() { document.getElementById('photo-modal').classList.remove('show'); }
+
+  function switchPhotoTab(tab, btn) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('photo-tab-upload').style.display = tab === 'upload' ? 'block' : 'none';
+    document.getElementById('photo-tab-archive').style.display = tab === 'archive' ? 'block' : 'none';
+  }
+
+  function handlePhotoFile(file) {
+    if (!file) return;
+    pendingPhotoFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('photo-preview-img').src = e.target.result;
+      document.getElementById('photo-preview').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function selectArchivePhoto(id, el) {
+    selectedArchiveId = id;
+    document.querySelectorAll('.ap-thumb').forEach(t => t.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  async function savePhoto() {
+    const caption = document.getElementById('phm-caption').value.trim();
+    const taken_date = document.getElementById('phm-date').value || null;
+    const isUpload = document.getElementById('photo-tab-upload').style.display !== 'none';
+
+    if (isUpload && pendingPhotoFile) {
+      const fd = new FormData();
+      fd.append('file', pendingPhotoFile);
+      fd.append('caption', caption);
+      if (taken_date) fd.append('taken_date', taken_date);
+      const res = await fetch(`/api/tracker/plants/${photoPlantId}/photos`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.success) { closePhotoModal(); showToast('Photo added'); await loadDetail(photoPlantId); }
+      else showToast(data.error || 'Failed', 'error');
+    } else if (!isUpload && selectedArchiveId) {
+      const res = await fetch(`/api/tracker/plants/${photoPlantId}/photos`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ archive_photo_id: selectedArchiveId, caption, taken_date })
+      });
+      const data = await res.json();
+      if (data.success) { closePhotoModal(); showToast('Photo linked'); await loadDetail(photoPlantId); }
+      else showToast(data.error || 'Failed', 'error');
+    } else {
+      showToast('Please select or upload a photo', 'warn');
+    }
+  }
+
+  async function deleteTrackerPhoto(id) {
+    await fetch(`/api/tracker/photos/${id}`, { method: 'DELETE' });
+    showToast('Photo removed');
+    await loadDetail(currentPlantId);
+  }
+
+  // ── Presets ───────────────────────────────────────────────────────────────
+  async function loadTypePresets() {
+    const presets = await fetch('/api/tracker/presets/types').then(r => r.json());
+    document.getElementById('type-presets').innerHTML = presets.map(p => `<option value="${escHtml(p)}">`).join('');
+  }
+
+  // ── Lightbox ──────────────────────────────────────────────────────────────
+  function openLightbox(src) {
+    document.getElementById('lb-img').src = src;
+    document.getElementById('lightbox').classList.add('show');
+  }
+  function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
+  document.getElementById('lightbox').addEventListener('click', function(e) { if (e.target === this) closeLightbox(); });
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      ['plant-modal','care-modal','issue-modal','photo-modal'].forEach(id =>
+        document.getElementById(id).classList.remove('show'));
+      closeLightbox();
+    }
+    if (e.key === 'Enter' && document.getElementById('plant-modal').classList.contains('show') && document.activeElement.tagName !== 'TEXTAREA') savePlant();
+    if (e.key === 'Enter' && document.getElementById('care-modal').classList.contains('show') && document.activeElement.tagName !== 'TEXTAREA') saveCare();
+    if (e.key === 'Enter' && document.getElementById('issue-modal').classList.contains('show') && document.activeElement.tagName !== 'TEXTAREA') saveIssue();
+  });
+
+  // ── Close modals on backdrop click ────────────────────────────────────────
+  ['plant-modal','care-modal','issue-modal','photo-modal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', function(e) {
+      if (e.target === this) this.classList.remove('show');
+    });
+  });
+
+  // Photo drop zone
+  const pdz = document.getElementById('photo-drop-zone');
+  pdz.addEventListener('dragover', e => { e.preventDefault(); pdz.classList.add('dragover'); });
+  pdz.addEventListener('dragleave', () => pdz.classList.remove('dragover'));
+  pdz.addEventListener('drop', e => { e.preventDefault(); pdz.classList.remove('dragover'); handlePhotoFile(e.dataTransfer.files[0]); });
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function fmtDate(d) {
+    if (!d) return '—';
+    return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.className = `show toast-${type}`;
+    clearTimeout(t._timer); t._timer = setTimeout(() => t.className = '', 3500);
+  }
+  function doLogout() { fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/'); }
+
+  init();
+</script>
+</body>
+</html>

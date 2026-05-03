@@ -55,6 +55,7 @@ def init_db():
     conn.commit()
     conn.close()
     print("Database initialized.")
+    init_tracker_tables()
 
 
 # ── Users ─────────────────────────────────────────────────────────────────────
@@ -400,3 +401,344 @@ def log_action(photo_id: int, action: str, detail: str = ""):
                    (photo_id, action, detail))
     conn.commit()
     conn.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PLANT TRACKER — separate from photo archive
+# ══════════════════════════════════════════════════════════════════════════════
+
+def init_tracker_tables():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.executescript("""
+        CREATE TABLE IF NOT EXISTS tracked_plants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            plant_type TEXT,
+            variety TEXT,
+            pot_size TEXT,
+            location TEXT,
+            acquired_date DATE,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS care_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plant_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            care_type TEXT NOT NULL,
+            care_date DATE NOT NULL,
+            product TEXT,
+            amount TEXT,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (plant_id) REFERENCES tracked_plants(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS plant_issues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plant_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            issue_name TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            first_seen DATE,
+            resolved_date DATE,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (plant_id) REFERENCES tracked_plants(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS tracker_photos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plant_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            archive_photo_id INTEGER DEFAULT NULL,
+            file_path TEXT,
+            stored_filename TEXT,
+            caption TEXT,
+            taken_date DATE,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (plant_id) REFERENCES tracked_plants(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS plant_type_presets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            UNIQUE(user_id, name)
+        );
+
+        CREATE TABLE IF NOT EXISTS care_product_presets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            care_type TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            UNIQUE(user_id, care_type, product_name)
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+
+# ── Tracked plants ────────────────────────────────────────────────────────────
+
+def create_tracked_plant(user_id, name, plant_type, variety, pot_size,
+                          location, acquired_date, notes):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO tracked_plants
+        (user_id, name, plant_type, variety, pot_size, location, acquired_date, notes)
+        VALUES (?,?,?,?,?,?,?,?)
+    """, (user_id, name, plant_type, variety, pot_size, location, acquired_date, notes))
+    conn.commit()
+    pid = cursor.lastrowid
+    conn.close()
+    # auto-add type preset
+    if plant_type:
+        add_type_preset(user_id, plant_type)
+    return pid
+
+
+def update_tracked_plant(plant_id, user_id, name, plant_type, variety,
+                          pot_size, location, acquired_date, notes):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE tracked_plants SET name=?,plant_type=?,variety=?,pot_size=?,
+        location=?,acquired_date=?,notes=?,updated_at=CURRENT_TIMESTAMP
+        WHERE id=? AND user_id=?
+    """, (name, plant_type, variety, pot_size, location, acquired_date, notes,
+          plant_id, user_id))
+    conn.commit()
+    conn.close()
+    if plant_type:
+        add_type_preset(user_id, plant_type)
+
+
+def delete_tracked_plant(plant_id, user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM care_logs WHERE plant_id=? AND user_id=?", (plant_id, user_id))
+    cursor.execute("DELETE FROM plant_issues WHERE plant_id=? AND user_id=?", (plant_id, user_id))
+    cursor.execute("DELETE FROM tracker_photos WHERE plant_id=? AND user_id=?", (plant_id, user_id))
+    cursor.execute("DELETE FROM tracked_plants WHERE id=? AND user_id=?", (plant_id, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_tracked_plants(user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT tp.*,
+            (SELECT MAX(care_date) FROM care_logs
+             WHERE plant_id=tp.id AND care_type='watered') as last_watered,
+            (SELECT MAX(care_date) FROM care_logs
+             WHERE plant_id=tp.id AND care_type='fertilized') as last_fertilized,
+            (SELECT MAX(care_date) FROM care_logs
+             WHERE plant_id=tp.id AND care_type='sprayed') as last_sprayed,
+            (SELECT COUNT(*) FROM plant_issues
+             WHERE plant_id=tp.id AND status='active') as active_issues,
+            (SELECT COUNT(*) FROM tracker_photos
+             WHERE plant_id=tp.id) as photo_count
+        FROM tracked_plants tp
+        WHERE tp.user_id=?
+        ORDER BY tp.name
+    """, (user_id,))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_tracked_plant(plant_id, user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tracked_plants WHERE id=? AND user_id=?",
+                   (plant_id, user_id))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+# ── Care logs ─────────────────────────────────────────────────────────────────
+
+def add_care_log(plant_id, user_id, care_type, care_date, product, amount, notes):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO care_logs (plant_id, user_id, care_type, care_date, product, amount, notes)
+        VALUES (?,?,?,?,?,?,?)
+    """, (plant_id, user_id, care_type, care_date, product, amount, notes))
+    conn.commit()
+    lid = cursor.lastrowid
+    conn.close()
+    if product and care_type:
+        add_product_preset(user_id, care_type, product)
+    return lid
+
+
+def get_care_logs(plant_id, user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM care_logs WHERE plant_id=? AND user_id=?
+        ORDER BY care_date DESC, created_at DESC
+    """, (plant_id, user_id))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def delete_care_log(log_id, user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM care_logs WHERE id=? AND user_id=?", (log_id, user_id))
+    conn.commit()
+    conn.close()
+
+
+# ── Issues ────────────────────────────────────────────────────────────────────
+
+def add_issue(plant_id, user_id, category, issue_name, status, first_seen, notes):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO plant_issues
+        (plant_id, user_id, category, issue_name, status, first_seen, notes)
+        VALUES (?,?,?,?,?,?,?)
+    """, (plant_id, user_id, category, issue_name, status, first_seen, notes))
+    conn.commit()
+    iid = cursor.lastrowid
+    conn.close()
+    return iid
+
+
+def update_issue(issue_id, user_id, status, resolved_date, notes):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE plant_issues SET status=?, resolved_date=?, notes=?
+        WHERE id=? AND user_id=?
+    """, (status, resolved_date, notes, issue_id, user_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_issue(issue_id, user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM plant_issues WHERE id=? AND user_id=?", (issue_id, user_id))
+    conn.commit()
+    conn.close()
+
+
+def get_issues(plant_id, user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM plant_issues WHERE plant_id=? AND user_id=?
+        ORDER BY status ASC, first_seen DESC
+    """, (plant_id, user_id))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+# ── Tracker photos ────────────────────────────────────────────────────────────
+
+def add_tracker_photo(plant_id, user_id, archive_photo_id, file_path,
+                       stored_filename, caption, taken_date):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO tracker_photos
+        (plant_id, user_id, archive_photo_id, file_path, stored_filename, caption, taken_date)
+        VALUES (?,?,?,?,?,?,?)
+    """, (plant_id, user_id, archive_photo_id, file_path, stored_filename,
+          caption, taken_date))
+    conn.commit()
+    tid = cursor.lastrowid
+    conn.close()
+    return tid
+
+
+def get_tracker_photos(plant_id, user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM tracker_photos WHERE plant_id=? AND user_id=?
+        ORDER BY taken_date DESC, added_at DESC
+    """, (plant_id, user_id))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def delete_tracker_photo(photo_id, user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tracker_photos WHERE id=? AND user_id=?",
+                   (photo_id, user_id))
+    row = cursor.fetchone()
+    cursor.execute("DELETE FROM tracker_photos WHERE id=? AND user_id=?",
+                   (photo_id, user_id))
+    conn.commit()
+    conn.close()
+    return dict(row) if row else None
+
+
+# ── Presets ───────────────────────────────────────────────────────────────────
+
+def add_type_preset(user_id, name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("INSERT INTO plant_type_presets (user_id, name) VALUES (?,?)",
+                       (user_id, name.strip()))
+        conn.commit()
+    except: pass
+    conn.close()
+
+
+def get_type_presets(user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM plant_type_presets WHERE user_id=? ORDER BY name",
+                   (user_id,))
+    rows = [r["name"] for r in cursor.fetchall()]
+    conn.close()
+    return rows
+
+
+def add_product_preset(user_id, care_type, product_name):
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO care_product_presets (user_id, care_type, product_name)
+            VALUES (?,?,?)
+        """, (user_id, care_type, product_name.strip()))
+        conn.commit()
+    except: pass
+    conn.close()
+
+
+def get_product_presets(user_id, care_type):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT product_name FROM care_product_presets
+        WHERE user_id=? AND care_type=? ORDER BY product_name
+    """, (user_id, care_type))
+    rows = [r["product_name"] for r in cursor.fetchall()]
+    conn.close()
+    return rows
