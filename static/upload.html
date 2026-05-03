@@ -63,7 +63,6 @@
 
   .date-warning { display:none; background:var(--amber-50); border:1px solid #EF9F27; border-radius:8px; padding:0.6rem 0.9rem; font-size:0.82rem; color:var(--amber-400); margin-top:0.75rem; }
 
-  /* inbox stats bar */
   .inbox-bar {
     display: flex;
     align-items: center;
@@ -73,7 +72,6 @@
   .inbox-bar h3 { font-family:'Playfair Display',serif; font-size:1.2rem; font-weight:400; }
   .inbox-count { font-size:0.8rem; color:var(--gray-200); }
 
-  /* photo grid */
   .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:0.85rem; }
   .photo-card { background:white; border-radius:12px; overflow:hidden; border:1px solid var(--gray-100); transition:transform 0.15s,box-shadow 0.15s; }
   .photo-card:hover { transform:translateY(-2px); box-shadow:0 5px 18px rgba(23,52,4,0.1); }
@@ -102,8 +100,6 @@
 </nav>
 
 <div class="page">
-
-  <!-- Upload zone -->
   <div class="upload-zone" id="drop-zone">
     <span class="uz-icon">📷</span>
     <h2>Drop photos or folders here</h2>
@@ -118,7 +114,6 @@
     <div class="date-warning" id="date-warning">⚠ Some photos had no EXIF date. Set a date above and re-drop them.</div>
   </div>
 
-  <!-- Inbox -->
   <div class="inbox-bar">
     <h3>📥 Inbox</h3>
     <span class="inbox-count" id="inbox-count"></span>
@@ -130,7 +125,6 @@
       <p>Your inbox is empty — drop some photos above</p>
     </div>
   </div>
-
 </div>
 
 <div id="toast"></div>
@@ -151,7 +145,7 @@
     loadInbox();
   }
 
-  // ── Drag & drop ───────────────────────────────────────────────────────────
+  // --- Drag & Drop ---
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
   dropZone.addEventListener('drop', async e => {
@@ -189,59 +183,85 @@
     });
   }
 
-  // ── Upload ────────────────────────────────────────────────────────────────
+  // --- Revised Upload Logic ---
   async function handleFiles(files) {
     if (!files.length) return;
+    
     const videos = files.filter(f => VIDEO_EXTS.has(ext(f.name)));
     const toUpload = files.filter(f => !VIDEO_EXTS.has(ext(f.name)));
-    if (videos.length) showToast('Can not handle videos', 'warn');
+    
+    if (videos.length) showToast('Videos were skipped', 'warn');
     if (!toUpload.length) return;
 
     document.getElementById('spinner-overlay').classList.add('show');
-    let ok = 0, noDate = [];
+    let ok = 0, dupes = 0, noDate = [];
 
     for (const file of toUpload) {
       const fd = new FormData();
       fd.append('file', file);
       const d = document.getElementById('manual-date').value;
       if (d) fd.append('date', d);
+
       try {
-        const res = await fetch('/api/upload', { method:'POST', body:fd });
+        const res = await fetch('/api/upload', { method: 'POST', body: fd });
         const data = await res.json();
-        if (res.status === 422 && data.error === 'no_date') noDate.push(file.name);
-        else if (data.success) ok++;
-      } catch { showToast('Upload failed — server running?', 'error'); }
+
+        if (res.status === 409) {
+          dupes++;
+        } else if (res.status === 422 && data.error === 'no_date') {
+          noDate.push(file.name);
+        } else if (res.ok && data.success) {
+          ok++;
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+      }
     }
 
     document.getElementById('spinner-overlay').classList.remove('show');
 
-    if (noDate.length) {
-      document.getElementById('date-warning').style.display = 'block';
-      showToast(`Set a date and retry: ${noDate.slice(0,3).join(', ')}${noDate.length>3?'…':''}`, 'warn');
-    } else {
-      document.getElementById('date-warning').style.display = 'none';
+    // Update visibility of missing date warning
+    const dateWarning = document.getElementById('date-warning');
+    dateWarning.style.display = noDate.length ? 'block' : 'none';
+
+    // Summary message
+    const summary = [];
+    if (ok) summary.push(`${ok} photo${ok > 1 ? 's' : ''} added`);
+    if (dupes) summary.push(`${dupes} duplicate${dupes > 1 ? 's' : ''} skipped`);
+    if (noDate.length) summary.push(`${noDate.length} need a date`);
+
+    if (summary.length) {
+      const toastType = (ok === 0 && dupes > 0) ? 'warn' : 'success';
+      setTimeout(() => showToast(summary.join(' · '), toastType), 100);
     }
 
     if (ok) {
-      showToast(`${ok} photo${ok>1?'s':''} added to inbox`);
-      fileInput.value = ''; folderInput.value = '';
+      fileInput.value = ''; 
+      folderInput.value = '';
       loadInbox();
     }
   }
 
-  // ── Inbox ─────────────────────────────────────────────────────────────────
-  async function loadInbox() {
-    const photos = await fetch('/api/photos/label/inbox').then(r => r.json());
-    document.getElementById('inbox-count').textContent =
-      `${photos.length} photo${photos.length !== 1 ? 's' : ''}`;
+  // --- Inbox Handling ---
+  const INBOX_PAGE = 50;
+  let inboxPhotos = [], inboxPage = 1;
 
+  async function loadInbox() {
+    inboxPhotos = await fetch('/api/photos/label/inbox').then(r => r.json());
+    inboxPage = 1;
+    document.getElementById('inbox-count').textContent =
+      `${inboxPhotos.length} photo${inboxPhotos.length !== 1 ? 's' : ''}`;
+    renderInbox();
+  }
+
+  function renderInbox() {
     const wrap = document.getElementById('photo-grid-wrap');
-    if (!photos.length) {
+    if (!inboxPhotos.length) {
       wrap.innerHTML = `<div class="empty-state"><div class="icon">🌱</div><p>Your inbox is empty — drop some photos above</p></div>`;
       return;
     }
-
-    wrap.innerHTML = `<div class="photo-grid">${photos.map(p => `
+    const shown = inboxPhotos.slice(0, inboxPage * INBOX_PAGE);
+    wrap.innerHTML = `<div class="photo-grid">${shown.map(p => `
       <div class="photo-card">
         <img src="/uploads/user_${window._userId}/inbox/${p.stored_filename}" loading="lazy"
              onerror="this.style.background='#EAF3DE';this.style.height='155px'">
@@ -250,10 +270,15 @@
           <div class="p-label">${p.label || 'unlabeled'}</div>
         </div>
       </div>
-    `).join('')}</div>`;
+    `).join('')}</div>
+    ${shown.length < inboxPhotos.length ? `
+      <div style="text-align:center;padding:1.5rem;">
+        <span style="font-size:.82rem;color:#B4B2A9;margin-right:1rem;">Showing ${shown.length} of ${inboxPhotos.length}</span>
+        <button onclick="inboxPage++;renderInbox()" style="padding:.45rem 1rem;border-radius:8px;background:#F1EFE8;border:1px solid #D3D1C7;font-family:inherit;font-size:.85rem;cursor:pointer;">Load more</button>
+      </div>` : ''}`;
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // --- Helpers ---
   function ext(name) { return name.slice(name.lastIndexOf('.')).toLowerCase(); }
   function fmtDate(d) {
     if (!d) return 'Unknown date';

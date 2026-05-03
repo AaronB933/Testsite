@@ -316,7 +316,8 @@
   const SO = ['spring','summer','fall','winter'];
   const YEARS = Array.from({length:12},(_,i)=>2026-i);
 
-  let allPhotos=[], currentView='all', selectedIds=new Set();
+  const PAGE_SIZE = 50;
+  let allPhotos=[], displayedPhotos=[], currentPage=1, currentView='all', selectedIds=new Set();
   let openYears=new Set(), openPlants=new Set();
   let lbIndex=0, confirmCallback=null, isTrashView=false;
 
@@ -472,7 +473,10 @@
         <button class="btn btn-red" onclick="permanentDeleteSelected()">✕ Delete Forever</button>`;
     } else { tbRight.innerHTML=''; }
 
-    renderGrid(photos);
+    currentPage = 1;
+    displayedPhotos = photos.slice(0, PAGE_SIZE);
+    renderGrid(displayedPhotos);
+    renderLoadMore(photos);
   }
 
   // ── Render grid ───────────────────────────────────────────────────────────
@@ -504,6 +508,37 @@
     }).join('')}</div>`;
   }
 
+  function renderLoadMore(allP){
+    const existing = document.getElementById('load-more-bar');
+    if(existing) existing.remove();
+    const shown = displayedPhotos.length;
+    const total = allP.length;
+    if(shown >= total) return;
+    const bar = document.createElement('div');
+    bar.id = 'load-more-bar';
+    bar.style.cssText = 'text-align:center;padding:1.5rem;';
+    bar.innerHTML = `
+      <span style="font-size:.82rem;color:var(--gray200);margin-right:1rem;">Showing ${shown} of ${total}</span>
+      <button class="btn btn-ghost" onclick="loadMore()">Load ${Math.min(PAGE_SIZE, total-shown)} more</button>
+      <button class="btn btn-ghost" style="margin-left:.5rem" onclick="loadAll()">Load all ${total}</button>`;
+    document.getElementById('grid-wrap').after(bar);
+  }
+
+  function loadMore(){
+    currentPage++;
+    const next = allPhotos.slice(0, currentPage * PAGE_SIZE);
+    displayedPhotos = next;
+    renderGrid(next);
+    renderLoadMore(allPhotos);
+  }
+
+  function loadAll(){
+    displayedPhotos = allPhotos;
+    renderGrid(allPhotos);
+    const bar = document.getElementById('load-more-bar');
+    if(bar) bar.remove();
+  }
+
   // ── Selection ─────────────────────────────────────────────────────────────
   function cardMD(e,id){e.stopPropagation();}
   function cardClick(e,id){
@@ -526,7 +561,7 @@
     updateSelBar();
   }
   function clearSelection(){selectedIds.clear();document.querySelectorAll('.photo-card.selected').forEach(c=>c.classList.remove('selected'));updateSelBar();}
-  function selectAll(){allPhotos.forEach(p=>selectedIds.add(p.id));renderGrid(allPhotos);updateSelBar();}
+  function selectAll(){allPhotos.forEach(p=>selectedIds.add(p.id));renderGrid(displayedPhotos);updateSelBar();}
   function updateSelBar(){
     const bar=document.getElementById('sel-bar');
     bar.classList.toggle('show',selectedIds.size>0);
@@ -682,10 +717,20 @@
     showConfirm('Move to Trash?',
       `${count} photo${count>1?'s':''} will be moved to trash. You can restore them later.`,
       'Move to Trash',async()=>{
-        const res=await fetch('/api/photos/trash',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:Array.from(selectedIds)})});
-        const data=await res.json();
-        if(data.success){showToast(`${data.trashed} photo${data.trashed!==1?'s':''} moved to trash`);clearSelection();await loadSidebar();loadView(currentView,document.querySelector('.sb-item.active,.sub-row.active,.variety-row.active'));}
-        else showToast('Failed to trash photos','error');
+        const ids=Array.from(selectedIds);
+        const CHUNK=50; let trashed=0;
+        document.getElementById('spinner-msg').textContent=`Deleting ${ids.length} photos...`;
+        document.getElementById('spinner-overlay').classList.add('show');
+        for(let i=0;i<ids.length;i+=CHUNK){
+          const chunk=ids.slice(i,i+CHUNK);
+          const res=await fetch('/api/photos/trash',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:chunk})});
+          const data=await res.json();
+          if(data.success) trashed+=data.trashed;
+        }
+        document.getElementById('spinner-overlay').classList.remove('show');
+        showToast(`${trashed} photo${trashed!==1?'s':''} moved to trash`);
+        clearSelection();await loadSidebar();
+        loadView(currentView,document.querySelector('.sb-item.active,.sub-row.active,.variety-row.active'));
       });
   }
 
@@ -756,7 +801,12 @@
   async function confirmOk(){closeConfirm();if(confirmCallback)await confirmCallback();}
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  function fmtDate(d){if(!d)return 'Unknown date';return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+  function fmtDate(d){
+    if(!d)return 'Unknown date';
+    const dt = new Date(d);
+    if(isNaN(dt)) return 'Unknown date';
+    return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  }
   function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`show toast-${type}`;clearTimeout(t._timer);t._timer=setTimeout(()=>t.className='',4000);}
   function doLogout(){fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/');}
 

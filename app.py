@@ -2,8 +2,10 @@ import os
 import shutil
 from datetime import date, datetime
 from flask import Flask, request, jsonify, send_from_directory, session
+from dotenv import load_dotenv
+load_dotenv()
 
-from database import (init_db, create_user, verify_user, insert_photo, log_action,
+from database import (init_db, create_user, verify_user, insert_photo, log_action, execute,
                       init_tracker_tables,
                       get_all_photos, get_photos_by_label, get_photos_by_label_variety,
                       get_photos_by_year_season, get_photos_by_year,
@@ -22,7 +24,7 @@ from exifutils import (read_date_taken, write_date_to_exif, build_stored_filenam
 app = Flask(__name__, static_folder="static", template_folder="static")
 app.secret_key = os.environ.get("SECRET_KEY", "plant-archive-secret-change-me")
 
-UPLOAD_BASE = os.path.join(os.path.dirname(__file__), "uploads")
+UPLOAD_BASE = os.path.join(os.path.dirname(__file__), os.environ.get("UPLOAD_BASE", "uploads"))
 VIDEO_EXTENSIONS = {'.mp4','.mov','.avi','.mkv','.m4v','.wmv','.flv','.webm','.3gp'}
 
 
@@ -167,6 +169,21 @@ def upload_photo():
 
     temp_path = os.path.join(inbox_dir, f"_temp_{original_filename}")
     file.save(temp_path)
+    # Check for duplicate
+    import hashlib
+    with open(temp_path, 'rb') as f:
+        file_hash = hashlib.md5(f.read()).hexdigest()
+
+    existing = execute(
+        "SELECT id, stored_filename FROM photos WHERE user_id = :uid AND file_hash = :hash",
+        {"uid": user["id"], "hash": file_hash}
+    )
+    if existing:
+        os.remove(temp_path)
+        return jsonify({
+            "error": "duplicate",
+            "message": f"Already uploaded as {existing[0]['stored_filename']}"
+        }), 409
 
     date_taken, exif_found = read_date_taken(temp_path)
 
@@ -186,7 +203,23 @@ def upload_photo():
     stored_filename = build_stored_filename(date_taken, "photo", ext, existing)
     final_path = os.path.join(inbox_dir, stored_filename)
 
-    shutil.move(temp_path, final_path)
+    # Convert HEIC to JPEG if needed
+    if ext.lower() in {'.heic', '.heif'}:
+        try:
+            from PIL import Image
+            from pillow_heif import register_heif_opener
+            register_heif_opener()
+            img = Image.open(temp_path)
+            final_path = final_path.replace('.heic', '.jpg').replace('.heif', '.jpg')
+            stored_filename = stored_filename.replace('.heic', '.jpg').replace('.heif', '.jpg')
+            img.save(final_path, 'JPEG', quality=95)
+            os.remove(temp_path)
+        except Exception as e:
+            print(f"HEIC conversion failed: {e}")
+            shutil.move(temp_path, final_path)
+    else:
+        shutil.move(temp_path, final_path)
+
     write_date_to_exif(final_path, date_taken)
 
     dt = date_taken.date() if hasattr(date_taken, 'date') else date_taken
@@ -196,7 +229,8 @@ def upload_photo():
         stored_filename=stored_filename,
         file_path=final_path,
         date_taken=dt,
-        exif_found=exif_found
+        exif_found=exif_found,
+        file_hash=file_hash
     )
     log_action(photo_id, "uploaded", original_filename)
 
@@ -582,8 +616,8 @@ def tracker_photo_add(plant_id):
         caption = request.form.get("caption","")
         taken_date = request.form.get("taken_date","") or None
         original = os.path.basename(file.filename.replace("/",os.sep).replace("\\",os.sep))
-        ext = os.path.splitext(original)[1].lower()
-        tracker_dir = os.path.join(user_dir(u["id"]), "tracker", str(plant_id))
+        # Line 586 was first Claude error
+        # replace("\"),os.sep)) was the error, had to include two \\'s to account for windows treating as a blank
         os.makedirs(tracker_dir, exist_ok=True)
         stored = f"tp_{plant_id}_{original}"
         counter = 2
