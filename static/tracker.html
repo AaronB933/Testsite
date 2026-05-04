@@ -819,7 +819,8 @@ function openCareModal(plantId) {
     switchPhotoTab('upload', document.querySelector('.tab-btn'));
 
     // Load archive photos for picker
-    const archivePhotos = await fetch('/api/photos').then(r => r.json());
+    const data = await fetch('/api/photos?limit=60&offset=0').then(r => r.json());
+    const archivePhotos = data.photos || data;
     document.getElementById('archive-picker').innerHTML = archivePhotos.slice(0, 60).map(p => `
       <img class="ap-thumb" src="/uploads/user_${window._userId}/inbox/${p.stored_filename}"
            data-id="${p.id}" loading="lazy"
