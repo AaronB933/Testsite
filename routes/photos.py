@@ -118,6 +118,22 @@ def upload_photo():
 
     write_date_to_exif(final_path, date_taken)
 
+    # Generate thumbnail for fast grid loading
+    try:
+        from PIL import Image as PILImage
+        thumb_dir = os.path.join(
+            os.path.dirname(UPLOAD_BASE), 'thumbnails',
+            f"user_{user['id']}", 'inbox'
+        )
+        os.makedirs(thumb_dir, exist_ok=True)
+        thumb_path = os.path.join(thumb_dir, stored_filename)
+        if not os.path.exists(thumb_path):
+            img = PILImage.open(final_path)
+            img.thumbnail((400, 400), PILImage.LANCZOS)
+            img.save(thumb_path, 'JPEG', quality=85, optimize=True)
+    except Exception as e:
+        print(f"Thumbnail generation failed: {e}")
+
     dt = date_taken.date() if hasattr(date_taken, 'date') else date_taken
     photo_id = insert_photo(
         user_id=user["id"],
@@ -136,6 +152,52 @@ def upload_photo():
         "stored_filename": stored_filename,
         "date_taken": date_taken.strftime("%m-%d-%Y") if hasattr(date_taken, 'strftime') else str(date_taken),
     })
+
+
+# ── All photos (no pagination — for virtual scroller) ─────────────────────────────
+
+@bp.route("/api/photos/all")
+@login_required
+def all_photos_full():
+    """Returns ALL photos for a view with no pagination limit.
+    Used by the virtual scroller which manages rendering itself."""
+    uid = current_user()["id"]
+    view = request.args.get("view", "all")
+    from database import (get_photos_by_label_variety,
+                          get_photos_by_year_season, get_photos_by_year,
+                          get_trashed_photos as _get_trashed)
+
+    if view == "all":
+        photos = execute(
+            "SELECT * FROM photos WHERE user_id = :uid AND trashed = FALSE ORDER BY date_taken DESC",
+            {"uid": uid}
+        )
+    elif view == "inbox":
+        photos = execute(
+            "SELECT * FROM photos WHERE user_id = :uid AND trashed = FALSE AND (label IS NULL OR label = '') ORDER BY date_taken DESC",
+            {"uid": uid}
+        )
+    elif view == "trash":
+        photos = _get_trashed(uid)
+    elif view.startswith("label:"):
+        label = view[6:]
+        photos = db_execute(
+            "SELECT * FROM photos WHERE user_id = :uid AND trashed = FALSE AND label = :label ORDER BY date_taken DESC",
+            {"uid": uid, "label": label}
+        )
+    elif view.startswith("plant:"):
+        parts = view.split(":")
+        photos = get_photos_by_label_variety(uid, parts[1], parts[2])
+    elif view.startswith("year:"):
+        parts = view.split(":")
+        if len(parts) > 2 and parts[2]:
+            photos = get_photos_by_year_season(uid, int(parts[1]), parts[2])
+        else:
+            photos = get_photos_by_year(uid, int(parts[1]))
+    else:
+        photos = []
+
+    return jsonify({"photos": photos, "total": len(photos)})
 
 
 # ── Photo lists ─────────────────────────────────────────────────────────────────
@@ -238,4 +300,24 @@ def assign_variety():
 def serve_upload(filename):
     if not current_user():
         return jsonify({"error": "Not logged in"}), 401
-    return send_from_directory(UPLOAD_BASE, filename)
+    from flask import make_response
+    response = make_response(send_from_directory(UPLOAD_BASE, filename))
+    # Cache images aggressively in browser — 7 days
+    # This makes re-scrolling instant since images are already in browser cache
+    response.headers['Cache-Control'] = 'private, max-age=604800'
+    return response
+
+
+@bp.route("/thumbnails/<path:filename>")
+def serve_thumbnail(filename):
+    """Serve pre-generated thumbnails for the photo grid."""
+    if not current_user():
+        return jsonify({"error": "Not logged in"}), 401
+    from flask import make_response
+    thumb_base = os.path.join(os.path.dirname(UPLOAD_BASE), 'thumbnails')
+    if not os.path.exists(os.path.join(thumb_base, filename)):
+        # Fall back to full image if thumbnail doesn't exist
+        return serve_upload(filename)
+    response = make_response(send_from_directory(thumb_base, filename))
+    response.headers['Cache-Control'] = 'private, max-age=604800'
+    return response

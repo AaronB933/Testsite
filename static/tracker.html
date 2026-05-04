@@ -702,12 +702,12 @@
 
   // ── Care modal ────────────────────────────────────────────────────────────
   let carePlantId = null;
-function openCareModal(plantId) {
+  function openCareModal(plantId) {
     carePlantId = plantId;
-    // Only set date if empty
-    if (!document.getElementById('cm-date').value) {
-      document.getElementById('cm-date').value = new Date().toISOString().split('T')[0];
-    }
+    document.getElementById('cm-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('cm-product').value = '';
+    document.getElementById('cm-amount').value = '';
+    document.getElementById('cm-notes').value = '';
     loadProductPresets();
     document.getElementById('care-modal').classList.add('show');
   }
@@ -819,8 +819,7 @@ function openCareModal(plantId) {
     switchPhotoTab('upload', document.querySelector('.tab-btn'));
 
     // Load archive photos for picker
-    const data = await fetch('/api/photos?limit=60&offset=0').then(r => r.json());
-    const archivePhotos = data.photos || data;
+    const archivePhotos = await fetch('/api/photos').then(r => r.json());
     document.getElementById('archive-picker').innerHTML = archivePhotos.slice(0, 60).map(p => `
       <img class="ap-thumb" src="/uploads/user_${window._userId}/inbox/${p.stored_filename}"
            data-id="${p.id}" loading="lazy"
@@ -928,11 +927,9 @@ function openCareModal(plantId) {
   pdz.addEventListener('drop', e => { e.preventDefault(); pdz.classList.remove('dragover'); handlePhotoFile(e.dataTransfer.files[0]); });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  function fmtDate(d){
-    if(!d)return 'Unknown date';
-    const dt = new Date(d);
-    if(isNaN(dt)) return 'Unknown date';
-    return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  function fmtDate(d) {
+    if (!d) return '—';
+    return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   }
   function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

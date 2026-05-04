@@ -8,8 +8,12 @@ venv/
 *.db
 
 # Uploads (photos — too large for git)
+thumbnails/
 uploads/
 
 # OS junk
 .DS_Store
 Thumbs.db
+*.jpg
+*.png
+*.jpeg

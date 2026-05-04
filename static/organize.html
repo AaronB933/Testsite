@@ -38,7 +38,7 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 
   /* Layout */
-  .layout{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 60px);}
+  .layout{display:grid;grid-template-columns:270px 1fr;height:calc(100vh - 60px);overflow:hidden;}
 
   /* Sidebar */
   .sidebar{background:white;border-right:1px solid var(--gray100);padding:1rem 0;overflow-y:auto;}
@@ -81,7 +81,7 @@
   .btn-org:hover{opacity:.88;}
 
   /* Main */
-  .main{padding:1.75rem 2rem;min-width:0;position:relative;}
+  .main{padding:1.75rem 2rem;min-width:0;position:relative;overflow-y:auto;height:calc(100vh - 60px);}
   .toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem;}
   .toolbar-left{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;}
   .toolbar-title{font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:400;}
@@ -100,7 +100,7 @@
   .sel-bar .sel-count{font-size:.85rem;color:var(--gray600);white-space:nowrap;font-weight:500;}
 
   /* Photo grid */
-  .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.85rem;position:relative;}
+  .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--card-size,160px),1fr));gap:.85rem;position:relative;}
   .photo-card{background:white;border-radius:12px;overflow:hidden;border:2px solid transparent;transition:transform .12s,box-shadow .12s,border-color .12s;position:relative;cursor:pointer;contain:layout style;}
   .photo-card:hover{transform:translateY(-2px);box-shadow:0 5px 18px rgba(23,52,4,.1);}
   .photo-card.selected{border-color:var(--g600);box-shadow:0 0 0 1px var(--g600);}
@@ -119,6 +119,16 @@
   .badge-summer{background:#FDE9BF;color:#7A4F0A;}
   .badge-fall{background:#F5D5C5;color:#7A2A0A;}
   .badge-winter{background:#D0E4F5;color:#1A4A6E;}
+
+  .zoom-bar{display:flex;gap:.25rem;align-items:center;margin-left:.5rem;}
+  .zoom-btn{padding:.3rem .6rem;border-radius:6px;font-family:inherit;font-size:.75rem;font-weight:600;cursor:pointer;border:1px solid var(--gray100);background:var(--gray50);color:var(--gray600);transition:background .15s;}
+  .zoom-btn:hover{background:var(--g50);border-color:var(--g100);}
+  .zoom-btn.active{background:var(--g800);color:var(--g50);border-color:var(--g800);}
+
+  /* Virtual scroll container */
+  #virtual-wrap{position:relative;overflow:hidden;}
+  #virtual-spacer-top{pointer-events:none;}
+  #virtual-spacer-bottom{pointer-events:none;}
 
   .empty-state{text-align:center;padding:3.5rem 2rem;color:var(--gray200);}
   .empty-state .icon{font-size:2.5rem;margin-bottom:.75rem;}
@@ -232,6 +242,12 @@
         <div class="toolbar-count" id="view-count"></div>
       </div>
       <div class="toolbar-right" id="toolbar-right"></div>
+      <div class="zoom-bar">
+        <button class="zoom-btn" data-size="120" onclick="setZoom(120)" title="Small">S</button>
+        <button class="zoom-btn active" data-size="160" onclick="setZoom(160)" title="Medium">M</button>
+        <button class="zoom-btn" data-size="200" onclick="setZoom(200)" title="Large">L</button>
+        <button class="zoom-btn" data-size="240" onclick="setZoom(240)" title="Extra Large">XL</button>
+      </div>
     </div>
 
     <div class="sel-bar" id="sel-bar">
@@ -317,9 +333,18 @@
   const YEARS = Array.from({length:12},(_,i)=>2026-i);
 
   let allPhotos=[], currentView='all', selectedIds=new Set();
-  let currentOffset=0, currentTotal=0, currentLoadingView=null, isLoading=false;
   let openYears=new Set(), openPlants=new Set();
   let lbIndex=0, confirmCallback=null, isTrashView=false;
+
+  // Virtual scroll state
+  let vsCardSize = 160;      // px — current zoom level
+  let vsColumns = 1;         // calculated from container width
+  let vsRowHeight = 0;       // card height + gap
+  let vsRenderedStart = -1;  // first rendered photo index
+  let vsRenderedEnd = -1;    // last rendered photo index
+  let vsRafId = null;
+  const VS_BUFFER_ROWS = 2;  // extra rows above/below viewport
+  const VS_GAP = 14;         // px — matches .85rem gap
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init(){
@@ -339,6 +364,8 @@
       loadView('all',document.getElementById('sb-all'));
     }
     setupDragSelect();
+    setupVirtualScroll();
+    setZoom(160);
   }
 
   // ── Sidebar ───────────────────────────────────────────────────────────────
@@ -433,11 +460,8 @@
   async function loadView(view, el){
     clearSelection();
     currentView = view;
-    currentOffset = 0;
-    currentTotal = 0;
     allPhotos = [];
     isTrashView = (view==='trash');
-    currentLoadingView = view;
 
     document.querySelectorAll('.sb-item,.sub-row,.variety-row,.tree-row').forEach(i=>i.classList.remove('active'));
     if(el) el.classList.add('active');
@@ -458,6 +482,7 @@
 
     document.getElementById('view-title').textContent=title;
     document.getElementById('view-count').textContent='Loading...';
+    document.getElementById('grid-wrap').innerHTML=`<div class="empty-state"><div class="icon">⏳</div><p>Loading...</p></div>`;
 
     const tbRight=document.getElementById('toolbar-right');
     if(isTrashView){
@@ -466,86 +491,94 @@
         <button class="btn btn-red" onclick="permanentDeleteSelected()">✕ Delete Forever</button>`;
     } else { tbRight.innerHTML=''; }
 
-    document.getElementById('grid-wrap').innerHTML=`<div class="empty-state"><div class="icon">⏳</div><p>Loading...</p></div>`;
-    const existing = document.getElementById('load-more-bar');
-    if(existing) existing.remove();
+    // Fetch ALL photos upfront — virtual scroller handles rendering
+    const r = await fetch(`/api/photos/all?view=${encodeURIComponent(view)}`).then(r=>r.json());
+    allPhotos = r.photos || [];
 
-    await loadMorePhotos(view, true);
-  }
+    document.getElementById('view-count').textContent=
+      `${allPhotos.length} photo${allPhotos.length!==1?'s':''}`;
 
-  async function fetchPhotosForView(view, limit, offset){
-    if(view==='all') {
-      const r = await fetch(`/api/photos?limit=${limit}&offset=${offset}`).then(r=>r.json());
-      return r;
-    } else if(view==='inbox') {
-      const r = await fetch(`/api/photos/label/inbox?limit=${limit}&offset=${offset}`).then(r=>r.json());
-      return r;
-    } else if(view==='trash') {
-      const photos = await fetch('/api/photos/trash').then(r=>r.json());
-      return {photos, total: photos.length};
-    } else if(view.startsWith('label:')) {
-      const label=view.slice(6);
-      const r = await fetch(`/api/photos/label/${encodeURIComponent(label)}?limit=${limit}&offset=${offset}`).then(r=>r.json());
-      return r;
-    } else if(view.startsWith('plant:')) {
-      const parts=view.split(':');
-      const r = await fetch(`/api/photos/label/${encodeURIComponent(parts[1])}/variety/${encodeURIComponent(parts[2])}`).then(r=>r.json());
-      return {photos: r.photos || r, total: r.total || (r.photos || r).length};
-    } else if(view.startsWith('year:')) {
-      const parts=view.split(':');
-      let r;
-      if(parts[2]) r = await fetch(`/api/photos/year/${parts[1]}/season/${parts[2]}`).then(r=>r.json());
-      else r = await fetch(`/api/photos/year/${parts[1]}`).then(r=>r.json());
-      return {photos: r.photos || r, total: r.total || (r.photos || r).length};
-    }
-    return {photos:[], total:0};
-  }
-
-  async function loadMorePhotos(view, reset=false){
-    if(isLoading) return;
-    isLoading = true;
-    const BATCH = 50;
-    const data = await fetchPhotosForView(view, BATCH, currentOffset);
-    const newPhotos = data.photos || [];
-    currentTotal = data.total || 0;
-
-    if(reset) allPhotos = newPhotos;
-    else allPhotos = [...allPhotos, ...newPhotos];
-
-    currentOffset += newPhotos.length;
-    isLoading = false;
-
-    document.getElementById('view-count').textContent=`${currentOffset} of ${currentTotal} photo${currentTotal!==1?'s':''}`;
-    renderGrid(allPhotos);
-    updateLoadMoreBar();
-  }
-
-  function updateLoadMoreBar(){
-    const existing = document.getElementById('load-more-bar');
-    if(existing) existing.remove();
-    if(currentOffset >= currentTotal) return;
-    const remaining = currentTotal - currentOffset;
-    const bar = document.createElement('div');
-    bar.id = 'load-more-bar';
-    bar.style.cssText='text-align:center;padding:1.5rem;';
-    bar.innerHTML=`
-      <span style="font-size:.82rem;color:var(--gray200);margin-right:1rem;">${currentOffset} of ${currentTotal} shown</span>
-      <button class="btn btn-ghost" onclick="loadMorePhotos('${currentView}')">Load ${Math.min(50,remaining)} more</button>`;
-    document.getElementById('grid-wrap').after(bar);
-  }
-
-  // ── Render grid ───────────────────────────────────────────────────────────
-  function renderGrid(photos){
-    const wrap=document.getElementById('grid-wrap');
-    if(!photos.length){
-      wrap.innerHTML=`<div class="empty-state"><div class="icon">${isTrashView?'🗑':'🌱'}</div><p>${isTrashView?'Trash is empty':'No photos here yet'}</p></div>`;
+    if(!allPhotos.length){
+      document.getElementById('grid-wrap').innerHTML=`<div class="empty-state"><div class="icon">${isTrashView?'🗑':'🌱'}</div><p>${isTrashView?'Trash is empty':'No photos here yet'}</p></div>`;
       return;
     }
-    wrap.innerHTML=`<div class="photo-grid" id="photo-grid">${photos.map((p,i)=>{
-      const src=`/uploads/user_${window._userId}/inbox/${p.stored_filename}`;
-      const sel=selectedIds.has(p.id)?'selected':'';
-      const badge=p.season?`<span class="season-badge badge-${p.season}">${SE[p.season]} ${p.season} ${p.season_year||''}</span>`:'';
-      const variety=p.variety?`<div class="p-variety">↳ ${p.variety}</div>`:'';
+
+    initVirtualScroll();
+  }
+
+  // ── Zoom ──────────────────────────────────────────────────────────────────
+  function setZoom(size){
+    vsCardSize = size;
+    document.documentElement.style.setProperty('--card-size', size+'px');
+    document.querySelectorAll('.zoom-btn').forEach(b=>{
+      b.classList.toggle('active', parseInt(b.dataset.size)===size);
+    });
+    if(allPhotos.length) initVirtualScroll();
+  }
+
+  // ── Virtual scroll engine ─────────────────────────────────────────────────
+  function initVirtualScroll(){
+    // Calculate grid geometry
+    const main = document.getElementById('main-area');
+    const gridWidth = main.clientWidth - 64; // subtract padding
+    vsColumns = Math.max(1, Math.floor((gridWidth + VS_GAP) / (vsCardSize + VS_GAP)));
+    vsRowHeight = vsCardSize + 60 + VS_GAP; // card img + info height + gap
+
+    const totalRows = Math.ceil(allPhotos.length / vsColumns);
+    const totalHeight = totalRows * vsRowHeight;
+
+    // Build virtual container
+    document.getElementById('grid-wrap').innerHTML = `
+      <div id="virtual-wrap" style="position:relative;height:${totalHeight}px;">
+        <div id="virtual-spacer-top" style="height:0px;"></div>
+        <div class="photo-grid" id="photo-grid" style="position:absolute;width:100%;left:0;"></div>
+        <div id="virtual-spacer-bottom" style="height:0px;"></div>
+      </div>`;
+
+    vsRenderedStart = -1;
+    vsRenderedEnd = -1;
+    vsUpdate(true);
+  }
+
+  function vsUpdate(force=false){
+    if(!allPhotos.length) return;
+    const main = document.getElementById('main-area');
+    const scrollTop = main.scrollTop;
+    const viewH = main.clientHeight;
+
+    // Which rows are visible
+    const firstVisRow = Math.max(0, Math.floor(scrollTop / vsRowHeight) - VS_BUFFER_ROWS);
+    const lastVisRow  = Math.min(
+      Math.ceil(allPhotos.length / vsColumns) - 1,
+      Math.floor((scrollTop + viewH) / vsRowHeight) + VS_BUFFER_ROWS
+    );
+
+    const newStart = firstVisRow * vsColumns;
+    const newEnd   = Math.min(allPhotos.length - 1, (lastVisRow + 1) * vsColumns - 1);
+
+    // Skip if visible range hasn't changed (unless forced e.g. after zoom)
+    if(!force && newStart === vsRenderedStart && newEnd === vsRenderedEnd) return;
+    vsRenderedStart = newStart;
+    vsRenderedEnd   = newEnd;
+
+    // Update spacers so scrollbar is accurate
+    const topH = firstVisRow * vsRowHeight;
+    const botH = Math.max(0, (Math.ceil(allPhotos.length/vsColumns) - lastVisRow - 1) * vsRowHeight);
+    const st = document.getElementById('virtual-spacer-top');
+    const sb = document.getElementById('virtual-spacer-bottom');
+    if(st) st.style.height = topH + 'px';
+    if(sb) sb.style.height = botH + 'px';
+
+    // Render only visible slice
+    const grid = document.getElementById('photo-grid');
+    if(!grid) return;
+    grid.style.top = topH + 'px';
+    grid.innerHTML = allPhotos.slice(newStart, newEnd + 1).map((p, localIdx) => {
+      const i = newStart + localIdx;
+      const src = `/thumbnails/user_${window._userId}/inbox/${p.stored_filename}`;
+      const sel = selectedIds.has(p.id) ? 'selected' : '';  // selection preserved across zoom
+      const badge = p.season ? `<span class="season-badge badge-${p.season}">${SE[p.season]} ${p.season} ${p.season_year||''}</span>` : '';
+      const variety = p.variety ? `<div class="p-variety">↳ ${p.variety}</div>` : '';
       return `
         <div class="photo-card ${sel}" data-id="${p.id}" data-index="${i}"
              onmousedown="cardMD(event,${p.id})"
@@ -553,30 +586,33 @@
              ondblclick="openLightbox(${i})"
              oncontextmenu="showCtx(event,${p.id})">
           <div class="sel-check">✓</div>
-          <img src="${src}" loading="lazy" onerror="this.style.background='#EAF3DE';this.style.height='160px'">
+          <img src="${src}" loading="lazy" onerror="this.style.background='#EAF3DE';this.style.height='${vsCardSize}px'">
           <div class="info">
             <div class="p-date">${fmtDate(p.date_taken)}</div>
             <div class="p-label">${p.label||'unlabeled'}</div>
             ${variety}${badge}
           </div>
         </div>`;
-    }).join('')}</div>`;
+    }).join('');
   }
 
-  function renderLoadMore(allP){
-    const existing = document.getElementById('load-more-bar');
-    if(existing) existing.remove();
-    const shown = displayedPhotos.length;
-    const total = allP.length;
-    if(shown >= total) return;
-    const bar = document.createElement('div');
-    bar.id = 'load-more-bar';
-    bar.style.cssText = 'text-align:center;padding:1.5rem;';
-    bar.innerHTML = `
-      <span style="font-size:.82rem;color:var(--gray200);margin-right:1rem;">Showing ${shown} of ${total}</span>
-      <button class="btn btn-ghost" onclick="loadMore()">Load ${Math.min(PAGE_SIZE, total-shown)} more</button>
-      <button class="btn btn-ghost" style="margin-left:.5rem" onclick="loadAll()">Load all ${total}</button>`;
-    document.getElementById('grid-wrap').after(bar);
+  function vsScheduleUpdate(){
+    if(vsRafId) return;
+    vsRafId = requestAnimationFrame(()=>{ vsRafId=null; vsUpdate(); });
+  }
+
+  function setupVirtualScroll(){
+    const main = document.getElementById('main-area');
+    main.addEventListener('scroll', vsScheduleUpdate, {passive:true});
+    window.addEventListener('resize', ()=>{
+      if(allPhotos.length) initVirtualScroll();
+    });
+  }
+
+  // renderGrid — re-renders currently visible cards (e.g. after selection change)
+  function renderGrid(photos){
+    // For virtual scroll, just refresh the visible window
+    vsUpdate();
   }
 
   // ── Selection ─────────────────────────────────────────────────────────────
@@ -588,10 +624,10 @@
       const last=Array.from(selectedIds).pop();
       const a=ids.indexOf(last),b=ids.indexOf(id);
       ids.slice(Math.min(a,b),Math.max(a,b)+1).forEach(i=>selectedIds.add(i));
-      renderGrid(allPhotos);updateSelBar();
+      vsUpdate();updateSelBar();
     } else {
       if(selectedIds.has(id)&&selectedIds.size===1){clearSelection();}
-      else{selectedIds.clear();selectedIds.add(id);renderGrid(allPhotos);updateSelBar();}
+      else{selectedIds.clear();selectedIds.add(id);vsUpdate();updateSelBar();}
     }
   }
   function toggleSel(id){
@@ -601,7 +637,7 @@
     updateSelBar();
   }
   function clearSelection(){selectedIds.clear();document.querySelectorAll('.photo-card.selected').forEach(c=>c.classList.remove('selected'));updateSelBar();}
-  function selectAll(){allPhotos.forEach(p=>selectedIds.add(p.id));renderGrid(allPhotos);updateSelBar();}
+  function selectAll(){allPhotos.forEach(p=>selectedIds.add(p.id));vsUpdate();updateSelBar();}
   function updateSelBar(){
     const bar=document.getElementById('sel-bar');
     bar.classList.toggle('show',selectedIds.size>0);
@@ -609,63 +645,126 @@
   }
 
   // ── Drag select ───────────────────────────────────────────────────────────
+  // Uses mathematical index calculation instead of DOM rect cache.
+  // This works perfectly with virtual scroll — no DOM dependency for selection.
   function setupDragSelect(){
     const main = document.getElementById('main-area');
     const box  = document.getElementById('drag-select-box');
 
-    let dragging = false, startX = 0, startY = 0;
-    let rafId = null;
+    let dragging = false;
+    let startX = 0, startY = 0;       // mouse position at drag start (viewport coords)
+    let startScrollTop = 0;            // scrollTop at drag start
     let pendingMouseX = 0, pendingMouseY = 0;
-    let cachedRects = [];   // [{el, id, rect}] — built once on mousedown
+    let rafId = null, scrollRafId = null;
     let ctrlHeld = false;
-    let prevSelSet = new Set(); // track what was selected last frame
+    let preSelIds = new Set();         // ids selected before drag started (for ctrl mode)
 
-    function buildRectCache(){
-      cachedRects = [];
-      document.querySelectorAll('.photo-card').forEach(card => {
-        cachedRects.push({
-          el: card,
-          id: parseInt(card.dataset.id),
-          rect: card.getBoundingClientRect()
-        });
-      });
+    const SCROLL_ZONE  = 80;   // px from edge triggers auto-scroll
+    const SCROLL_SPEED = 14;   // px per auto-scroll frame
+
+    // Convert viewport Y → document Y (accounts for scroll)
+    function viewportToDocY(vy){ return vy + main.scrollTop; }
+    function viewportToDocX(vx){
+      const mainRect = main.getBoundingClientRect();
+      return vx - mainRect.left;
+    }
+
+    // Calculate selected indices using row/col math from scroll position
+    // Strategy: find which rows the selection rect spans, then which cols
+    function calcSelectedIndices(mouseX1, mouseY1, mouseX2, mouseY2){
+      if(!allPhotos.length || vsColumns < 1 || vsRowHeight < 1) return new Set();
+
+      const mainRect = main.getBoundingClientRect();
+      const containerW = main.clientWidth - 64; // subtract padding
+      const cardW = Math.floor((containerW - VS_GAP * (vsColumns - 1)) / vsColumns);
+
+      // Convert viewport mouse coords to position within virtual grid
+      // The grid starts at offsetTop of virtual-wrap relative to main-area
+      const wrap = document.getElementById('virtual-wrap');
+      const gridTop = wrap ? wrap.getBoundingClientRect().top - mainRect.top : 0;
+
+      // Selection rect in grid-relative coords
+      const selTop    = Math.min(mouseY1, mouseY2) - mainRect.top - gridTop;
+      const selBottom = Math.max(mouseY1, mouseY2) - mainRect.top - gridTop;
+      const selLeft   = Math.min(mouseX1, mouseX2) - mainRect.left;
+      const selRight  = Math.max(mouseX1, mouseX2) - mainRect.left;
+
+      // Which rows does the selection span?
+      const firstRow = Math.max(0, Math.floor(selTop / vsRowHeight));
+      const lastRow  = Math.min(
+        Math.ceil(allPhotos.length / vsColumns) - 1,
+        Math.floor(selBottom / vsRowHeight)
+      );
+
+      const selected = new Set();
+      for(let row = firstRow; row <= lastRow; row++){
+        for(let col = 0; col < vsColumns; col++){
+          const idx = row * vsColumns + col;
+          if(idx >= allPhotos.length) break;
+
+          // Card bounds in grid-relative coords
+          const cardLeft  = col * (cardW + VS_GAP);
+          const cardRight = cardLeft + cardW;
+
+          // Check horizontal overlap
+          if(cardLeft < selRight && cardRight > selLeft){
+            selected.add(allPhotos[idx].id);
+          }
+        }
+      }
+      return selected;
     }
 
     function applyFrame(){
       rafId = null;
       const mx = pendingMouseX, my = pendingMouseY;
-      const x = Math.min(mx, startX), y = Math.min(my, startY);
-      const w = Math.abs(mx - startX),  h = Math.abs(my - startY);
 
-      // Move the selection box (no layout recalc)
-      box.style.left   = x + 'px';
-      box.style.top    = y + 'px';
-      box.style.width  = w + 'px';
-      box.style.height = h + 'px';
+      // How much has the container scrolled since drag started?
+      const scrollDelta = main.scrollTop - startScrollTop;
 
-      const sr = {left:x, right:x+w, top:y, bottom:y+h};
-      const newSelSet = new Set();
+      // The visual start point moves UP as we scroll down
+      const effectiveStartY = startY - scrollDelta;
 
-      for(const {el, id, rect: r} of cachedRects){
-        const inside = r.left < sr.right && r.right > sr.left &&
-                       r.top  < sr.bottom && r.bottom > sr.top;
-        if(inside) newSelSet.add(id);
-        else if(!ctrlHeld && prevSelSet.has(id)){
-          // was inside, now outside — deselect only if not ctrl
-        }
-      }
+      // Draw selection box in viewport coords using scroll-adjusted start
+      const bx = Math.min(mx, startX),           by = Math.min(my, effectiveStartY);
+      const bw = Math.abs(mx - startX),           bh = Math.abs(my - effectiveStartY);
+      box.style.left = bx+'px'; box.style.top = by+'px';
+      box.style.width = bw+'px'; box.style.height = bh+'px';
 
-      // Only touch DOM for cards that actually changed state
-      for(const {el, id} of cachedRects){
-        const wasSelected = selectedIds.has(id);
-        const isSelected  = newSelSet.has(id) || (ctrlHeld && wasSelected);
-        if(isSelected === wasSelected) continue;
-        if(isSelected){ selectedIds.add(id);    el.classList.add('selected');    }
-        else           { selectedIds.delete(id); el.classList.remove('selected'); }
-      }
+      // Pass scroll-adjusted start Y for accurate index calculation
+      const newSel = calcSelectedIndices(startX, effectiveStartY, mx, my);
 
-      prevSelSet = newSelSet;
+      // Merge with pre-drag selection if ctrl held
+      const finalSel = ctrlHeld
+        ? new Set([...preSelIds, ...newSel])
+        : newSel;
+
+      // Update selectedIds and DOM for visible cards only
+      selectedIds.clear();
+      finalSel.forEach(id => selectedIds.add(id));
+
+      document.querySelectorAll('.photo-card').forEach(card => {
+        const id = parseInt(card.dataset.id);
+        card.classList.toggle('selected', selectedIds.has(id));
+      });
+
       updateSelBar();
+    }
+
+    // Auto-scroll when near edges
+    function autoScrollLoop(){
+      scrollRafId = null;
+      if(!dragging) return;
+      const mainRect = main.getBoundingClientRect();
+      const my = pendingMouseY;
+      if(my > mainRect.bottom - SCROLL_ZONE){
+        main.scrollTop += SCROLL_SPEED;
+      } else if(my < mainRect.top + SCROLL_ZONE){
+        main.scrollTop = Math.max(0, main.scrollTop - SCROLL_SPEED);
+      }
+      // vsUpdate runs from scroll event — no need to call it here
+      if(!rafId) rafId = requestAnimationFrame(applyFrame);
+      scrollRafId = requestAnimationFrame(autoScrollLoop);
     }
 
     main.addEventListener('mousedown', e => {
@@ -680,14 +779,14 @@
       startY = e.clientY;
       pendingMouseX = startX;
       pendingMouseY = startY;
-      prevSelSet = new Set();
+      startScrollTop = main.scrollTop;
+      preSelIds = ctrlHeld ? new Set(selectedIds) : new Set();
 
-      box.style.cssText = `display:block;left:${startX}px;top:${startY}px;width:0;height:0;`;
+      box.style.cssText=`display:block;left:${startX}px;top:${startY}px;width:0;height:0;`;
 
-      if(!ctrlHeld) clearSelection();
+      if(!ctrlHeld) { selectedIds.clear(); document.querySelectorAll('.photo-card.selected').forEach(c=>c.classList.remove('selected')); updateSelBar(); }
 
-      // Cache rects ONCE here — cards don't move during a drag
-      buildRectCache();
+      scrollRafId = requestAnimationFrame(autoScrollLoop);
     });
 
     document.addEventListener('mousemove', e => {
@@ -695,8 +794,6 @@
       pendingMouseX = e.clientX;
       pendingMouseY = e.clientY;
       ctrlHeld = e.ctrlKey || e.metaKey;
-
-      // Schedule one frame — if a frame is already queued, skip
       if(!rafId) rafId = requestAnimationFrame(applyFrame);
     });
 
@@ -705,7 +802,7 @@
       dragging = false;
       box.style.display = 'none';
       if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
-      cachedRects = [];
+      if(scrollRafId){ cancelAnimationFrame(scrollRafId); scrollRafId = null; }
     });
   }
 
@@ -713,7 +810,7 @@
   function showCtx(e,id){
     e.preventDefault();e.stopPropagation();
     closeCtx();
-    if(!selectedIds.has(id)){clearSelection();selectedIds.add(id);renderGrid(allPhotos);updateSelBar();}
+    if(!selectedIds.has(id)){clearSelection();selectedIds.add(id);vsUpdate();updateSelBar();}
     const menu=document.getElementById('ctx-menu');
     if(isTrashView){
       menu.innerHTML=`
@@ -841,8 +938,12 @@
         }
         document.getElementById('spinner-overlay').classList.remove('show');
         showToast(`${trashed} photo${trashed!==1?'s':''} moved to trash`);
-        clearSelection();await loadSidebar();
-        loadView(currentView,document.querySelector('.sb-item.active,.sub-row.active,.variety-row.active'));
+        clearSelection();
+        await loadSidebar();
+        const activeEl = document.querySelector('.sb-item.active,.sub-row.active,.variety-row.active');
+        await loadView(currentView, activeEl);
+        // Force virtual scroll reset after data changes
+        if(allPhotos.length) initVirtualScroll();
       });
   }
 
@@ -862,7 +963,7 @@
       'Delete Forever',async()=>{
         const res=await fetch('/api/photos/delete-permanent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({photo_ids:Array.from(selectedIds)})});
         const data=await res.json();
-        if(data.success){showToast(`${data.deleted} photo${data.deleted!==1?'s':''} permanently deleted`);clearSelection();await loadSidebar();loadView('trash',document.getElementById('sb-trash'));}
+        if(data.success){showToast(`${data.deleted} photo${data.deleted!==1?'s':''} permanently deleted`);clearSelection();await loadSidebar();await loadView('trash',document.getElementById('sb-trash'));if(allPhotos.length)initVirtualScroll();}
         else showToast('Failed','error');
       });
   }
@@ -910,7 +1011,7 @@
     document.getElementById('confirm-dialog').classList.add('show');
   }
   function closeConfirm(){document.getElementById('confirm-dialog').classList.remove('show');confirmCallback=null;}
-  async function confirmOk(){closeConfirm();if(confirmCallback)await confirmCallback();}
+  async function confirmOk(){const cb=confirmCallback;closeConfirm();if(cb)await cb();}
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function fmtDate(d){if(!d)return 'Unknown date';const dt=new Date(d);if(isNaN(dt))return 'Unknown date';return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
