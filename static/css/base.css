@@ -1,0 +1,197 @@
+/**
+ * base.css — Shared styles for all Plant Archive pages.
+ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --g50: #EAF3DE; --g100: #C0DD97; --g200: #97C459;
+  --g600: #3B6D11; --g800: #27500A; --g900: #173404;
+  --a50: #FAEEDA; --a400: #BA7517;
+  --gray50: #F1EFE8; --gray100: #D3D1C7; --gray200: #B4B2A9;
+  --gray600: #5F5E5A; --gray800: #444441;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #f7f5f0;
+  color: var(--gray800);
+  min-height: 100vh;
+  transition: background .2s, color .2s;
+}
+
+/* ── Dark mode ─────────────────────────────────────────────────────────── */
+html.dark-mode body {
+  background: #1a1a1a !important;
+  color: #ccc !important;
+}
+html.dark-mode nav { background: #0f2206 !important; }
+html.dark-mode .sidebar,
+html.dark-mode aside { background: #2a2a2a !important; border-color: #3a3a3a !important; }
+html.dark-mode .main { background: #1a1a1a !important; }
+html.dark-mode .photo-card,
+html.dark-mode .confirm-box,
+html.dark-mode #label-popup,
+html.dark-mode #variety-popup { background: #2a2a2a !important; border-color: #3a3a3a !important; color: #ccc !important; }
+html.dark-mode input,
+html.dark-mode select,
+html.dark-mode textarea { background: #1a1a1a !important; border-color: #3a3a3a !important; color: #ddd !important; }
+html.dark-mode .sb-item:hover,
+html.dark-mode .tree-row:hover,
+html.dark-mode .sub-row:hover,
+html.dark-mode .variety-row:hover { background: #333 !important; }
+html.dark-mode .sb-item.active,
+html.dark-mode .sub-row.active,
+html.dark-mode .variety-row.active { background: rgba(59,109,17,.3) !important; }
+html.dark-mode .btn-ghost { background: #333 !important; color: #ccc !important; border-color: #444 !important; }
+html.dark-mode .sel-bar { background: #2a2a2a !important; border-color: #3a3a3a !important; }
+html.dark-mode .photo-card .p-date { color: #97C459 !important; }
+html.dark-mode .photo-card .p-label { color: #888 !important; }
+html.dark-mode .toolbar-count { color: #888 !important; }
+html.dark-mode .org-box.season-box { background: linear-gradient(135deg,#0f2206,#173404) !important; }
+html.dark-mode .org-box.plant-box { background: linear-gradient(135deg,#1a3510,#2a5a1a) !important; }
+html.dark-mode .panel,
+html.dark-mode .modal-overlay .modal { background: #2a2a2a !important; border-color: #3a3a3a !important; color: #ccc !important; }
+
+/* ── Nav ────────────────────────────────────────────────────────────────── */
+nav {
+  background: var(--g900);
+  display: flex;
+  align-items: center;
+  padding: 0 2rem;
+  height: 60px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+nav .brand {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: var(--g50);
+  margin-right: 2rem;
+  white-space: nowrap;
+}
+nav .nav-links { display: flex; gap: .25rem; flex: 1; overflow: hidden; }
+nav a {
+  color: rgba(234,243,222,.6);
+  text-decoration: none;
+  font-size: .875rem;
+  font-weight: 500;
+  padding: .4rem .9rem;
+  border-radius: 8px;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+nav a:hover, nav a.active { background: rgba(255,255,255,.12); color: var(--g50); }
+nav .user-area { display: flex; align-items: center; gap: .75rem; margin-left: auto; flex-shrink: 0; }
+nav .username { font-size: .8rem; color: rgba(234,243,222,.5); }
+nav .logout-btn {
+  background: rgba(255,255,255,.1);
+  border: none;
+  color: var(--g50);
+  padding: .35rem .85rem;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+nav .logout-btn:hover { background: rgba(255,255,255,.18); }
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  padding: .7rem 1.2rem;
+  border-radius: 10px;
+  font-size: .875rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .25s, transform .25s;
+  pointer-events: none;
+  z-index: 9999;
+  max-width: 340px;
+  background: var(--g800);
+  color: var(--g50);
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+#toast.toast-error { background: #A32D2D; }
+#toast.toast-warn { background: var(--a400); }
+#toast.toast-info { background: var(--g600); }
+
+/* ── Spinner ────────────────────────────────────────────────────────────── */
+#spinner-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(23,52,4,.3);
+  z-index: 500;
+  align-items: center;
+  justify-content: center;
+}
+#spinner-overlay.show { display: flex; }
+.spinner-box {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem 2.5rem;
+  text-align: center;
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem;
+  color: var(--g800);
+}
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--g100);
+  border-top-color: var(--g600);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin: 0 auto .75rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Shared buttons ─────────────────────────────────────────────────────── */
+.btn {
+  padding: .45rem 1rem;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: .85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: background .15s;
+}
+.btn-ghost { background: var(--gray50); color: var(--gray600); border: 1px solid var(--gray100); }
+.btn-ghost:hover { background: var(--gray100); }
+.btn-green { background: var(--g800); color: var(--g50); }
+.btn-green:hover { background: var(--g900); }
+.btn-red { background: #A32D2D; color: white; }
+.btn-red:hover { background: #7A1A1A; }
+
+/* ── Confirm dialog ─────────────────────────────────────────────────────── */
+#confirm-dialog {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+}
+#confirm-dialog.show { display: flex; }
+.confirm-box {
+  background: white;
+  border-radius: 16px;
+  padding: 1.75rem 2rem;
+  max-width: 380px;
+  width: 90%;
+}
+.confirm-box h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  font-weight: 400;
+  margin-bottom: .5rem;
+}
+.confirm-box p { font-size: .85rem; color: var(--gray600); margin-bottom: 1.25rem; line-height: 1.5; }
+.confirm-actions { display: flex; gap: .6rem; justify-content: flex-end; }
