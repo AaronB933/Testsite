@@ -6,6 +6,14 @@
   <title>Plant Archive — Organize</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+  // Apply dark mode before render to prevent flash
+  (function(){
+    if(localStorage.getItem('site-dark-mode')==='dark'){
+      document.documentElement.classList.add('dark-mode');
+    }
+  })();
+</script>
 </head>
 <body>
 <style>
@@ -188,15 +196,58 @@
   .confirm-box h3{font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:400;margin-bottom:.5rem;}
   .confirm-box p{font-size:.85rem;color:var(--gray600);margin-bottom:1.25rem;line-height:1.5;}
   .confirm-actions{display:flex;gap:.6rem;justify-content:flex-end;}
+
+  /* Site-wide dark mode */
+  html.dark-mode body:not(.garden-page){
+    background:#1a1a1a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode nav { background:#0f2206 !important; }
+  html.dark-mode .sidebar, html.dark-mode .main,
+  html.dark-mode .panel, html.dark-mode aside {
+    background:#2a2a2a !important;
+    border-color:#3a3a3a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode .photo-card, html.dark-mode .modal,
+  html.dark-mode .confirm-box, html.dark-mode #label-popup,
+  html.dark-mode #variety-popup {
+    background:#2a2a2a !important;
+    border-color:#3a3a3a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode input, html.dark-mode select, html.dark-mode textarea {
+    background:#1a1a1a !important;
+    border-color:#3a3a3a !important;
+    color:#ddd !important;
+  }
+  html.dark-mode .sb-item:hover, html.dark-mode .tree-row:hover,
+  html.dark-mode .sub-row:hover, html.dark-mode .variety-row:hover {
+    background:#333 !important;
+  }
+  html.dark-mode .sb-item.active, html.dark-mode .sub-row.active,
+  html.dark-mode .variety-row.active {
+    background:rgba(59,109,17,.3) !important;
+  }
+  html.dark-mode .org-box.season-box { background:linear-gradient(135deg,#0f2206,#173404) !important; }
+  html.dark-mode .org-box.plant-box { background:linear-gradient(135deg,#1a3510,#2a5a1a) !important; }
+  html.dark-mode .btn-ghost { background:#333 !important; color:#ccc !important; border-color:#444 !important; }
+  html.dark-mode .sel-bar { background:#2a2a2a !important; border-color:#3a3a3a !important; }
+  html.dark-mode .photo-card .p-date { color:#97C459 !important; }
+  html.dark-mode .photo-card .p-label { color:#888 !important; }
+  html.dark-mode .toolbar-count { color:#888 !important; }
+
 </style>
 
 <nav>
   <span class="brand">🌿 Plant Archive</span>
   <div class="nav-links">
     <a href="/">Home</a>
-    <a href="/upload">Upload Photos</a>
-    <a href="/organize" class="active">Organize Photos</a>
+    <a href="/upload">Upload</a>
+    <a href="/organize" class="active">Organize</a>
     <a href="/tracker">Plant Tracker</a>
+    <a href="/badges">Badge Creation</a>
+    <a href="/garden">Garden Planner</a>
   </div>
   <div class="user-area">
     <span class="username" id="nav-username"></span>
@@ -272,12 +323,18 @@
   <h4>🏷 Label Photos</h4>
   <div class="popup-field">
     <label>Plant name <span style="color:#A32D2D">*</span></label>
-    <input type="text" id="lp-label" placeholder="e.g. tulip, rose..." />
+    <div style="display:flex;gap:.4rem;">
+      <input type="text" id="lp-label" list="lp-label-list" placeholder="e.g. tulip, rose..." style="flex:1" oninput="updateVarietyDropdown()" />
+      <datalist id="lp-label-list"></datalist>
+    </div>
   </div>
   <div class="popup-field">
     <label>Variety <span style="color:var(--gray200)">(optional)</span></label>
-    <input type="text" id="lp-variety" placeholder="e.g. Hakuun, Queen of Night..." />
-    <div class="hint">Leave blank for "No variety"</div>
+    <div style="display:flex;gap:.4rem;">
+      <input type="text" id="lp-variety" list="lp-variety-list" placeholder="e.g. Hakuun, Queen of Night..." style="flex:1" />
+      <datalist id="lp-variety-list"></datalist>
+    </div>
+    <div class="hint">Leave blank for "No variety" · Type to add new</div>
   </div>
   <div class="popup-actions">
     <button class="pop-ok" onclick="applyLabel()">Apply</button>
@@ -288,10 +345,69 @@
 <!-- Variety-only popup -->
 <div id="variety-popup">
   <h4>🌸 Set Variety</h4>
-  <input type="text" id="vp-variety" placeholder="e.g. Hakuun, Queen of Night..." />
+  <input type="text" id="vp-variety" list="vp-variety-list" placeholder="e.g. Hakuun, Queen of Night..." />
+  <datalist id="vp-variety-list"></datalist>
   <div class="popup-actions">
     <button class="pop-ok" onclick="applyVariety()">Apply</button>
     <button class="pop-cancel" onclick="closeVarietyPopup()">Cancel</button>
+  </div>
+</div>
+
+<!-- Image editor modal -->
+<div class="modal-overlay" id="editor-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2500;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:18px;padding:1.5rem;max-width:600px;width:95%;max-height:92vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:400;">✏️ Edit Photo</h3>
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <span id="editor-unsaved" style="display:none;font-size:.72rem;color:var(--a400);font-weight:500;">● Unsaved changes</span>
+        <button onclick="closeEditorModal()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--gray600);">✕</button>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div style="text-align:center;margin-bottom:1rem;position:relative;">
+      <img id="editor-preview" style="max-width:100%;max-height:280px;object-fit:contain;border-radius:8px;border:1px solid var(--gray100);" />
+      <div id="editor-changed-badge" style="display:none;position:absolute;top:8px;right:8px;background:var(--a400);color:white;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:10px;">Modified</div>
+    </div>
+
+    <!-- Tools grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;">
+      <!-- Rotate -->
+      <div style="background:var(--gray50);border-radius:10px;padding:.85rem;">
+        <div style="font-size:.75rem;font-weight:600;color:var(--gray600);margin-bottom:.5rem;">↻ Rotate</div>
+        <div style="display:flex;gap:.35rem;">
+          <button class="btn btn-ghost" style="flex:1;font-size:.75rem;" onclick="editRotate(-90)">↺ 90°</button>
+          <button class="btn btn-ghost" style="flex:1;font-size:.75rem;" onclick="editRotate(90)">↻ 90°</button>
+          <button class="btn btn-ghost" style="flex:1;font-size:.75rem;" onclick="editRotate(180)">180°</button>
+        </div>
+      </div>
+      <!-- Resize -->
+      <div style="background:var(--gray50);border-radius:10px;padding:.85rem;">
+        <div style="font-size:.75rem;font-weight:600;color:var(--gray600);margin-bottom:.5rem;">⤡ Resize</div>
+        <div style="display:flex;gap:.35rem;align-items:center;">
+          <input type="number" id="resize-w" placeholder="W px" style="width:58px;padding:.3rem .4rem;border:1px solid var(--gray100);border-radius:6px;font-size:.78rem;" />
+          <span style="font-size:.75rem;color:var(--gray200);">×</span>
+          <input type="number" id="resize-h" placeholder="H px" style="width:58px;padding:.3rem .4rem;border:1px solid var(--gray100);border-radius:6px;font-size:.78rem;" />
+          <button class="btn btn-green" style="font-size:.75rem;padding:.3rem .6rem;" onclick="editResize()">Go</button>
+        </div>
+        <div style="font-size:.68rem;color:var(--gray200);margin-top:.25rem;">Leave one blank to maintain ratio</div>
+      </div>
+    </div>
+
+    <!-- Save + Restore row -->
+    <div style="display:flex;gap:.6rem;margin-bottom:.75rem;">
+      <button id="editor-save-btn" class="btn btn-green" style="flex:2;opacity:.4;cursor:not-allowed;" onclick="editSave()" disabled>💾 Save Changes</button>
+      <button class="btn btn-ghost" style="flex:1;" onclick="editDiscard()">↺ Discard</button>
+    </div>
+
+    <!-- Restore original -->
+    <div style="display:flex;gap:.5rem;justify-content:space-between;align-items:center;padding:.75rem;background:#FFF8E1;border-radius:10px;">
+      <div>
+        <div style="font-size:.8rem;font-weight:500;color:#7A4F0A;">Original backup</div>
+        <div style="font-size:.7rem;color:#9A6010;">Every edit auto-backs up the original before overwriting</div>
+      </div>
+      <button class="btn btn-ghost" style="font-size:.78rem;white-space:nowrap;" onclick="editRestoreOriginal()">↩ Restore</button>
+    </div>
   </div>
 </div>
 
@@ -335,6 +451,9 @@
   let allPhotos=[], currentView='all', selectedIds=new Set();
   let openYears=new Set(), openPlants=new Set();
   let lbIndex=0, confirmCallback=null, isTrashView=false;
+  let labelPresets=[], varietyPresets={};  // cached presets
+  let currentEditorPhotoId=null;
+  let editorPendingOp=null;  // {type, params} — queued operation not yet saved
 
   // Virtual scroll state
   let vsCardSize = 160;      // px — current zoom level
@@ -366,6 +485,7 @@
     setupDragSelect();
     setupVirtualScroll();
     setZoom(160);
+    loadLabelPresets();
   }
 
   // ── Sidebar ───────────────────────────────────────────────────────────────
@@ -821,6 +941,7 @@
       menu.innerHTML=`
         <div class="ctx-item" onclick="closeCtx();showLabelPopup()"><span class="ctx-icon">🏷</span> Set Label</div>
         <div class="ctx-item" onclick="closeCtx();showVarietyPopup()"><span class="ctx-icon">🌸</span> Set Variety</div>
+        <div class="ctx-item" onclick="closeCtx();openEditorModal(${id})"><span class="ctx-icon">✏️</span> Edit Photo</div>
         <div class="ctx-item" onclick="closeCtx();downloadSelected()"><span class="ctx-icon">⬇</span> Download</div>
         <div class="ctx-sep"></div>
         <div class="ctx-item danger" onclick="closeCtx();trashSelected()"><span class="ctx-icon">🗑</span> Move to Trash</div>`;
@@ -868,6 +989,8 @@
     if(data.success){
       showToast(`Labeled ${data.updated} photo${data.updated!==1?'s':''}${variety?` as "${label} › ${variety}"`:`as "${label}"`}`);
       clearSelection();await loadSidebar();
+      loadLabelPresets(); // refresh presets with any new labels
+      varietyPresets = {}; // clear variety cache
       loadView(currentView,document.querySelector('.sb-item.active,.sub-row.active,.variety-row.active'));
     } else showToast(data.error||'Failed','error');
   }
@@ -884,6 +1007,7 @@
     if(!selectedIds.size){showToast('Select some photos first','warn');return;}
     const popup=document.getElementById('variety-popup');
     document.getElementById('vp-variety').value='';
+    loadVarietyPresetsForPopup();
     popup.classList.add('show');
     popup.style.left=(window.innerWidth/2-130)+'px';
     popup.style.top=(window.innerHeight/2-70)+'px';
@@ -906,17 +1030,63 @@
     } else showToast(data.error||'Failed','error');
   }
 
+  // ── Label/Variety presets ─────────────────────────────────────────────────
+  async function loadLabelPresets(){
+    labelPresets = await fetch('/api/presets/labels').then(r=>r.json());
+    const dl = document.getElementById('lp-label-list');
+    if(dl) dl.innerHTML = labelPresets.map(l=>`<option value="${l}">`).join('');
+  }
+
+  async function updateVarietyDropdown(){
+    const label = document.getElementById('lp-label').value.trim().toLowerCase();
+    if(!label) return;
+    // Load varieties for this label (cached)
+    if(!varietyPresets[label]){
+      const vars = await fetch(`/api/presets/varieties?label=${encodeURIComponent(label)}`).then(r=>r.json());
+      varietyPresets[label] = vars;
+    }
+    const dl = document.getElementById('lp-variety-list');
+    if(dl) dl.innerHTML = (varietyPresets[label]||[]).map(v=>`<option value="${v}">`).join('');
+  }
+
+  async function loadVarietyPresetsForPopup(){
+    const vars = await fetch('/api/presets/varieties').then(r=>r.json());
+    const dl = document.getElementById('vp-variety-list');
+    if(dl) dl.innerHTML = vars.map(v=>`<option value="${v}">`).join('');
+  }
+
   // ── Download ──────────────────────────────────────────────────────────────
-  function downloadSelected(){
+  async function downloadSelected(){
     if(!selectedIds.size){showToast('Select photos first','warn');return;}
-    Array.from(selectedIds).forEach(id=>{
-      const photo=allPhotos.find(p=>p.id===id);
-      if(!photo)return;
-      const a=document.createElement('a');
-      a.href=`/uploads/user_${window._userId}/inbox/${photo.stored_filename}`;
-      a.download=photo.stored_filename;
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    const ids = Array.from(selectedIds);
+    if(ids.length === 1){
+      // Single file — direct download
+      const photo = allPhotos.find(p=>p.id===ids[0]);
+      if(!photo) return;
+      const a = document.createElement('a');
+      a.href = `/uploads/user_${window._userId}/inbox/${photo.stored_filename}`;
+      a.download = photo.stored_filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      return;
+    }
+    // Multiple files — download as zip
+    showToast(`Preparing ${ids.length} photos as zip...`, 'info');
+    const label = currentView.startsWith('label:') ? currentView.slice(6) : 'plant_archive_photos';
+    const folder_name = label.replace(/[^a-z0-9_]/gi,'_');
+    const res = await fetch('/api/photos/download-zip', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({photo_ids: ids, folder_name})
     });
+    if(!res.ok){ showToast('Download failed','error'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${folder_name}.zip`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded ${ids.length} photos as zip`);
   }
 
   // ── Trash ─────────────────────────────────────────────────────────────────
@@ -1002,6 +1172,131 @@
   }
   document.getElementById('lightbox').addEventListener('click',function(e){if(e.target===this)closeLightbox();});
 
+  // ── Image editor ──────────────────────────────────────────────────────────
+  function openEditorModal(photoId){
+    currentEditorPhotoId = photoId;
+    editorPendingOp = null;
+    const photo = allPhotos.find(p=>p.id===photoId);
+    if(!photo) return;
+    const src = `/uploads/user_${window._userId}/inbox/${photo.stored_filename}?t=${Date.now()}`;
+    document.getElementById('editor-preview').src = src;
+    document.getElementById('editor-modal').style.display = 'flex';
+    setEditorUnsaved(false);
+  }
+
+  function setEditorUnsaved(hasChanges){
+    document.getElementById('editor-unsaved').style.display = hasChanges ? 'inline' : 'none';
+    document.getElementById('editor-changed-badge').style.display = hasChanges ? 'block' : 'none';
+    const saveBtn = document.getElementById('editor-save-btn');
+    saveBtn.disabled = !hasChanges;
+    saveBtn.style.opacity = hasChanges ? '1' : '.4';
+    saveBtn.style.cursor = hasChanges ? 'pointer' : 'not-allowed';
+  }
+
+  function closeEditorModal(){
+    if(editorPendingOp){
+      showConfirm('Unsaved Changes',
+        'You have unsaved edits. Discard them?',
+        'Discard', ()=>{
+          editorPendingOp = null;
+          document.getElementById('editor-modal').style.display = 'none';
+          currentEditorPhotoId = null;
+          vsUpdate(true);
+        });
+      return;
+    }
+    document.getElementById('editor-modal').style.display = 'none';
+    currentEditorPhotoId = null;
+    vsUpdate(true);
+  }
+
+  function editRotate(degrees){
+    if(!currentEditorPhotoId) return;
+    // Stack rotations — if there's already a pending rotation, add to it
+    if(editorPendingOp && editorPendingOp.type === 'rotate'){
+      editorPendingOp.params.degrees = (editorPendingOp.params.degrees + degrees) % 360;
+    } else {
+      editorPendingOp = {type:'rotate', params:{degrees}};
+    }
+    // Show preview using CSS transform (no server call yet)
+    const preview = document.getElementById('editor-preview');
+    const currentRot = parseInt(preview.dataset.rot||'0');
+    const newRot = (currentRot + degrees) % 360;
+    preview.dataset.rot = newRot;
+    preview.style.transform = `rotate(${newRot}deg)`;
+    setEditorUnsaved(true);
+    showToast(`Rotate ${degrees > 0 ? '↻' : '↺'} ${Math.abs(degrees)}° — click Save to apply`, 'info');
+  }
+
+  function editResize(){
+    if(!currentEditorPhotoId) return;
+    const w = parseInt(document.getElementById('resize-w').value)||0;
+    const h = parseInt(document.getElementById('resize-h').value)||0;
+    if(!w && !h){ showToast('Enter width or height','warn'); return; }
+    editorPendingOp = {type:'resize', params:{width:w, height:h}};
+    setEditorUnsaved(true);
+    showToast(`Resize queued — click Save to apply`, 'info');
+  }
+
+  async function editSave(){
+    if(!editorPendingOp || !currentEditorPhotoId) return;
+    const op = editorPendingOp;
+    const url = `/api/photos/${currentEditorPhotoId}/${op.type}`;
+    const res = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(op.params)
+    });
+    const data = await res.json();
+    if(data.success){
+      editorPendingOp = null;
+      setEditorUnsaved(false);
+      // Reset CSS transform and reload actual saved image
+      const preview = document.getElementById('editor-preview');
+      preview.style.transform = '';
+      preview.dataset.rot = '0';
+      const t = Date.now();
+      const photo = allPhotos.find(p=>p.id===currentEditorPhotoId);
+      preview.src = `/uploads/user_${window._userId}/inbox/${photo.stored_filename}?t=${t}`;
+      showToast('Changes saved');
+      vsUpdate(true);
+    } else showToast(data.error||'Save failed','error');
+  }
+
+  function editDiscard(){
+    if(!editorPendingOp){ showToast('No pending changes','info'); return; }
+    editorPendingOp = null;
+    setEditorUnsaved(false);
+    // Reset CSS transform
+    const preview = document.getElementById('editor-preview');
+    preview.style.transform = '';
+    preview.dataset.rot = '0';
+    // Reload original from server
+    const photo = allPhotos.find(p=>p.id===currentEditorPhotoId);
+    preview.src = `/uploads/user_${window._userId}/inbox/${photo.stored_filename}?t=${Date.now()}`;
+    showToast('Changes discarded');
+  }
+
+  async function editRestoreOriginal(){
+    if(!currentEditorPhotoId) return;
+    showConfirm('Restore Original?',
+      'This will replace the current photo with the original backup. Any edits will be lost.',
+      'Restore', async()=>{
+        const res = await fetch(`/api/photos/${currentEditorPhotoId}/restore-original`, {method:'POST'});
+        const data = await res.json();
+        if(data.success){
+          editorPendingOp = null;
+          setEditorUnsaved(false);
+          const preview = document.getElementById('editor-preview');
+          preview.style.transform = '';
+          preview.dataset.rot = '0';
+          const photo = allPhotos.find(p=>p.id===currentEditorPhotoId);
+          preview.src = `/uploads/user_${window._userId}/inbox/${photo.stored_filename}?t=${Date.now()}`;
+          showToast('Original restored');
+          vsUpdate(true);
+        } else showToast(data.error||'No backup found','warn');
+      });
+  }
+
   // ── Confirm dialog ────────────────────────────────────────────────────────
   function showConfirm(title,msg,okLabel,cb){
     confirmCallback=cb;
@@ -1014,9 +1309,23 @@
   async function confirmOk(){const cb=confirmCallback;closeConfirm();if(cb)await cb();}
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  function fmtDate(d){if(!d)return 'Unknown date';const dt=new Date(d);if(isNaN(dt))return 'Unknown date';return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+  function fmtDate(d){if(!d)return 'Unknown date';const clean=d.includes('T')?d:d+'T00:00:00';const dt=new Date(clean);if(isNaN(dt))return 'Unknown date';return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
   function showToast(msg,type='success'){const t=document.getElementById('toast');t.textContent=msg;t.className=`show toast-${type}`;clearTimeout(t._timer);t._timer=setTimeout(()=>t.className='',4000);}
   function doLogout(){fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/');}
+
+
+  function toggleDarkMode(){
+    const isDark = document.documentElement.classList.toggle('dark-mode');
+    localStorage.setItem('site-dark-mode', isDark ? 'dark' : 'light');
+    // Update toggle button text on any page
+    const btn = document.getElementById('dark-mode-toggle');
+    if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+  }
+  // Init toggle button state
+  (function(){
+    const btn = document.getElementById('dark-mode-toggle');
+    if(btn) btn.textContent = document.documentElement.classList.contains('dark-mode') ? '☀️' : '🌙';
+  })();
 
   init();
 </script>

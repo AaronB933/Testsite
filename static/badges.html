@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Plant Archive — Badge Creation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+  // Apply dark mode before render to prevent flash
+  (function(){
+    if(localStorage.getItem('site-dark-mode')==='dark'){
+      document.documentElement.classList.add('dark-mode');
+    }
+  })();
+</script>
+</head>
+<body>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --g50:#EAF3DE;--g100:#C0DD97;--g200:#97C459;--g600:#3B6D11;--g800:#27500A;--g900:#173404;
+    --a50:#FAEEDA;--a400:#BA7517;
+    --gray50:#F1EFE8;--gray100:#D3D1C7;--gray200:#B4B2A9;--gray600:#5F5E5A;--gray800:#444441;
+  }
+  body{font-family:'DM Sans',sans-serif;background:#f7f5f0;color:var(--gray800);min-height:100vh;}
+
+  nav{background:var(--g900);display:flex;align-items:center;padding:0 2rem;height:60px;position:sticky;top:0;z-index:100;}
+  nav .brand{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:400;color:var(--g50);margin-right:2rem;}
+  nav .nav-links{display:flex;gap:.25rem;flex:1;}
+  nav a{color:rgba(234,243,222,.6);text-decoration:none;font-size:.875rem;font-weight:500;padding:.4rem .9rem;border-radius:8px;transition:background .15s,color .15s;}
+  nav a:hover,nav a.active{background:rgba(255,255,255,.12);color:var(--g50);}
+  nav .user-area{display:flex;align-items:center;gap:.75rem;margin-left:auto;}
+  nav .username{font-size:.8rem;color:rgba(234,243,222,.5);}
+  nav .logout-btn{background:rgba(255,255,255,.1);border:none;color:var(--g50);padding:.35rem .85rem;border-radius:8px;font-family:inherit;font-size:.8rem;cursor:pointer;}
+
+  #toast{position:fixed;bottom:2rem;right:2rem;padding:.7rem 1.2rem;border-radius:10px;font-size:.875rem;opacity:0;transform:translateY(10px);transition:opacity .25s,transform .25s;pointer-events:none;z-index:9999;max-width:340px;background:var(--g800);color:var(--g50);}
+  #toast.show{opacity:1;transform:translateY(0);}
+  #toast.toast-error{background:#A32D2D;}#toast.toast-warn{background:var(--a400);}#toast.toast-info{background:var(--g600);}
+  #spinner-overlay{display:none;position:fixed;inset:0;background:rgba(23,52,4,.4);z-index:500;align-items:center;justify-content:center;}
+  #spinner-overlay.show{display:flex;}
+  .spinner-box{background:white;border-radius:16px;padding:2rem 2.5rem;text-align:center;font-family:'Playfair Display',serif;font-size:1rem;color:var(--g800);}
+  .spinner{width:30px;height:30px;border:3px solid var(--g100);border-top-color:var(--g600);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto .75rem;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .page{max-width:1100px;margin:0 auto;padding:2rem;}
+  .page-header{margin-bottom:2rem;}
+  .page-header h1{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:400;color:var(--g800);}
+  .page-header p{font-size:.9rem;color:var(--gray200);margin-top:.3rem;}
+
+  .badge-layout{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+
+  .panel{background:white;border-radius:16px;border:1px solid var(--gray100);padding:1.5rem;}
+  .panel-title{font-family:'Playfair Display',serif;font-size:1rem;font-weight:400;margin-bottom:1rem;color:var(--g800);}
+
+  /* Upload zone */
+  .upload-zone{border:2px dashed var(--gray100);border-radius:12px;padding:2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;}
+  .upload-zone:hover,.upload-zone.dragover{border-color:var(--g600);background:var(--g50);}
+  .upload-zone p{font-size:.85rem;color:var(--gray200);}
+  .upload-zone .icon{font-size:2rem;margin-bottom:.5rem;}
+
+  /* Source image */
+  #source-wrap{display:none;position:relative;}
+  #source-img{width:100%;border-radius:10px;display:block;}
+  .img-overlay-btns{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap;}
+
+  /* Result area */
+  #result-wrap{display:none;}
+  .result-panels{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;}
+  .result-panel{text-align:center;}
+  .result-panel img{width:100%;border-radius:10px;border:1px solid var(--gray100);}
+  .result-panel p{font-size:.72rem;color:var(--gray200);margin-top:.3rem;}
+
+  /* Badge preview with backgrounds */
+  .bg-options{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem;}
+  .bg-opt{width:36px;height:36px;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:border-color .15s;}
+  .bg-opt:hover,.bg-opt.active{border-color:var(--g600);}
+  .badge-canvas-wrap{border-radius:12px;overflow:hidden;border:1px solid var(--gray100);margin-bottom:.75rem;background:repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 0 0 / 16px 16px;}
+  #badge-canvas{display:block;width:100%;max-height:300px;object-fit:contain;}
+
+  .btn{padding:.5rem 1.1rem;border-radius:8px;font-family:inherit;font-size:.875rem;font-weight:500;cursor:pointer;border:none;transition:background .15s;}
+  .btn-green{background:var(--g800);color:var(--g50);}
+  .btn-green:hover{background:var(--g900);}
+  .btn-ghost{background:var(--gray50);color:var(--gray600);border:1px solid var(--gray100);}
+
+  /* Archive picker */
+  .archive-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:.5rem;max-height:240px;overflow-y:auto;margin-top:.5rem;}
+  .arch-thumb{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:border-color .15s;}
+  .arch-thumb:hover,.arch-thumb.selected{border-color:var(--g600);}
+
+  .tab-bar{display:flex;gap:.25rem;background:var(--gray50);border-radius:10px;padding:3px;margin-bottom:1rem;}
+  .tab-btn{flex:1;padding:.4rem;text-align:center;border-radius:7px;font-size:.82rem;font-weight:500;cursor:pointer;color:var(--gray600);border:none;background:none;font-family:inherit;transition:background .15s;}
+  .tab-btn.active{background:white;color:var(--gray800);}
+
+  .info-box{background:var(--g50);border-radius:10px;padding:.85rem;font-size:.8rem;color:var(--g800);line-height:1.5;margin-bottom:1rem;}
+  .info-box strong{font-weight:600;}
+
+  @media(max-width:700px){.badge-layout{grid-template-columns:1fr;}.result-panels{grid-template-columns:1fr;}}
+
+  /* Site-wide dark mode */
+  html.dark-mode body:not(.garden-page){
+    background:#1a1a1a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode nav { background:#0f2206 !important; }
+  html.dark-mode .sidebar, html.dark-mode .main,
+  html.dark-mode .panel, html.dark-mode aside {
+    background:#2a2a2a !important;
+    border-color:#3a3a3a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode .photo-card, html.dark-mode .modal,
+  html.dark-mode .confirm-box, html.dark-mode #label-popup,
+  html.dark-mode #variety-popup {
+    background:#2a2a2a !important;
+    border-color:#3a3a3a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode input, html.dark-mode select, html.dark-mode textarea {
+    background:#1a1a1a !important;
+    border-color:#3a3a3a !important;
+    color:#ddd !important;
+  }
+  html.dark-mode .sb-item:hover, html.dark-mode .tree-row:hover,
+  html.dark-mode .sub-row:hover, html.dark-mode .variety-row:hover {
+    background:#333 !important;
+  }
+  html.dark-mode .sb-item.active, html.dark-mode .sub-row.active,
+  html.dark-mode .variety-row.active {
+    background:rgba(59,109,17,.3) !important;
+  }
+  html.dark-mode .org-box.season-box { background:linear-gradient(135deg,#0f2206,#173404) !important; }
+  html.dark-mode .org-box.plant-box { background:linear-gradient(135deg,#1a3510,#2a5a1a) !important; }
+  html.dark-mode .btn-ghost { background:#333 !important; color:#ccc !important; border-color:#444 !important; }
+  html.dark-mode .sel-bar { background:#2a2a2a !important; border-color:#3a3a3a !important; }
+  html.dark-mode .photo-card .p-date { color:#97C459 !important; }
+  html.dark-mode .photo-card .p-label { color:#888 !important; }
+  html.dark-mode .toolbar-count { color:#888 !important; }
+
+</style>
+
+<nav>
+  <span class="brand">🌿 Plant Archive</span>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/upload">Upload</a>
+    <a href="/organize">Organize</a>
+    <a href="/tracker">Plant Tracker</a>
+    <a href="/badges" class="active">Badge Creation</a>
+    <a href="/garden">Garden Planner</a>
+  </div>
+  <div class="user-area">
+    <span class="username" id="nav-username"></span>
+    <button class="logout-btn" onclick="doLogout()">Sign out</button>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>🏷 Badge Creation</h1>
+    <p>Isolate plant photos by removing backgrounds — perfect for product badges and labels</p>
+  </div>
+
+  <div class="info-box">
+    <strong>How it works:</strong> Upload or select a photo, click "Remove Background" and the AI will isolate your plant from its surroundings. You can then preview it on different backgrounds, resize, and download as PNG (transparent background) or JPEG (solid background).
+  </div>
+
+  <div class="badge-layout">
+
+    <!-- Left panel: source photo -->
+    <div class="panel">
+      <div class="panel-title">📷 Source Photo</div>
+
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('upload',this)">Upload New</button>
+        <button class="tab-btn" onclick="switchTab('archive',this)">From Archive</button>
+      </div>
+
+      <!-- Upload tab -->
+      <div id="tab-upload">
+        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+          <div class="icon">🌸</div>
+          <p>Click or drop a photo here</p>
+          <input type="file" id="file-input" style="display:none" accept=".jpg,.jpeg,.png,.heic,.heif" onchange="handleFile(this.files[0])"/>
+        </div>
+      </div>
+
+      <!-- Archive tab -->
+      <div id="tab-archive" style="display:none;">
+        <input type="text" id="arch-search" placeholder="Search labels..." style="width:100%;padding:.4rem .7rem;border:1px solid var(--gray100);border-radius:8px;font-family:inherit;font-size:.85rem;margin-bottom:.5rem;" oninput="filterArchive()"/>
+        <div class="archive-grid" id="archive-grid"></div>
+      </div>
+
+      <!-- Preview + Draw tool -->
+      <div id="source-wrap" style="margin-top:1rem;display:none;">
+        <!-- Draw tool toolbar -->
+        <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
+          <span style="font-size:.72rem;font-weight:600;color:var(--gray600);">Selection:</span>
+          <button id="tool-rect" class="btn btn-ghost" style="font-size:.72rem;padding:.25rem .6rem;" onclick="setTool('rect')">⬜ Rectangle</button>
+          <button id="tool-lasso" class="btn btn-ghost" style="font-size:.72rem;padding:.25rem .6rem;" onclick="setTool('lasso')">🪢 Lasso</button>
+          <button class="btn btn-ghost" style="font-size:.72rem;padding:.25rem .6rem;" onclick="clearSelection()">✕ Clear</button>
+          <span id="tool-hint" style="font-size:.68rem;color:var(--gray200);margin-left:.25rem;">Draw around your subject</span>
+        </div>
+        <!-- Canvas for draw tool -->
+        <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--gray100);cursor:crosshair;" id="canvas-wrap">
+          <canvas id="source-canvas" style="display:block;width:100%;"></canvas>
+          <canvas id="draw-canvas" style="position:absolute;inset:0;width:100%;pointer-events:all;"></canvas>
+        </div>
+        <div class="img-overlay-btns" style="margin-top:.6rem;">
+          <button class="btn btn-green" onclick="removeBackground()" id="remove-bg-btn">✨ Remove Background</button>
+          <button class="btn btn-ghost" onclick="clearSource()">✕ Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right panel: result -->
+    <div class="panel">
+      <div class="panel-title">🎨 Badge Preview</div>
+
+      <div id="result-empty" style="text-align:center;padding:3rem 1rem;color:var(--gray200);">
+        <div style="font-size:2.5rem;margin-bottom:.75rem;">🌿</div>
+        <p style="font-size:.85rem;">Remove a background to see your badge here</p>
+      </div>
+
+      <div id="result-wrap">
+        <!-- Background options -->
+        <div style="font-size:.75rem;font-weight:500;color:var(--gray600);margin-bottom:.5rem;">Background</div>
+        <div class="bg-options">
+          <div class="bg-opt active" data-bg="transparent" style="background:repeating-conic-gradient(#ddd 0% 25%,white 0% 50%) 0 0/12px 12px;" onclick="setBg('transparent',this)" title="Transparent"></div>
+          <div class="bg-opt" data-bg="#ffffff" style="background:#ffffff;border:1px solid #eee;" onclick="setBg('#ffffff',this)" title="White"></div>
+          <div class="bg-opt" data-bg="#000000" style="background:#000000;" onclick="setBg('#000000',this)" title="Black"></div>
+          <div class="bg-opt" data-bg="#EAF3DE" style="background:#EAF3DE;" onclick="setBg('#EAF3DE',this)" title="Light green"></div>
+          <div class="bg-opt" data-bg="#27500A" style="background:#27500A;" onclick="setBg('#27500A',this)" title="Dark green"></div>
+          <div class="bg-opt" data-bg="#FAEEDA" style="background:#FAEEDA;" onclick="setBg('#FAEEDA',this)" title="Cream"></div>
+          <div class="bg-opt" data-bg="custom" style="background:linear-gradient(135deg,#f06,#90f,#06f);" onclick="document.getElementById('custom-color').click()" title="Custom color"></div>
+          <input type="color" id="custom-color" style="display:none" onchange="setBg(this.value,null)"/>
+        </div>
+
+        <!-- Badge canvas -->
+        <div class="badge-canvas-wrap" id="badge-canvas-wrap">
+          <canvas id="badge-canvas"></canvas>
+        </div>
+
+        <!-- Download options -->
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+          <button class="btn btn-green" onclick="downloadBadge('png')">⬇ Download PNG</button>
+          <button class="btn btn-ghost" onclick="downloadBadge('jpg')">⬇ Download JPG</button>
+          <button class="btn btn-ghost" onclick="saveToBadges()">💾 Save to Badges</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="spinner-overlay">
+  <div class="spinner-box">
+    <div class="spinner"></div>
+    <span id="spinner-msg">Removing background...</span>
+  </div>
+</div>
+
+<script>
+  let sourceFile = null;
+  let resultImageData = null;
+  let currentBg = 'transparent';
+  let allArchivePhotos = [];
+
+  // Draw tool state
+  let activeTool = 'rect';  // 'rect' or 'lasso'
+  let isDrawing = false;
+  let drawStart = {x:0, y:0};
+  let lassoPoints = [];
+  let selectionData = null;  // {type, coords} — bounding box or lasso path
+  let sourceImage = null;    // HTMLImageElement of loaded photo
+
+  async function init(){
+    const res = await fetch('/api/me');
+    if(res.status===401){ window.location.href='/'; return; }
+    const user = await res.json();
+    window._userId = user.id;
+    document.getElementById('nav-username').textContent = user.username;
+    loadArchive();
+    setupDrawTool();
+    setTool('rect');
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  function switchTab(tab, btn){
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-upload').style.display = tab==='upload' ? 'block' : 'none';
+    document.getElementById('tab-archive').style.display = tab==='archive' ? 'block' : 'none';
+  }
+
+  // ── Tool selection ────────────────────────────────────────────────────────
+  function setTool(tool){
+    activeTool = tool;
+    document.getElementById('tool-rect').classList.toggle('active', tool==='rect');
+    document.getElementById('tool-lasso').classList.toggle('active', tool==='lasso');
+    document.getElementById('tool-hint').textContent =
+      tool==='rect' ? 'Click and drag a rectangle around your subject'
+                    : 'Click and drag to draw a freehand lasso';
+    clearSelectionDraw();
+  }
+
+  // ── Draw tool setup ───────────────────────────────────────────────────────
+  function setupDrawTool(){
+    const dc = document.getElementById('draw-canvas');
+    if(!dc) return;
+
+    dc.addEventListener('mousedown', e => {
+      if(!sourceImage) return;
+      isDrawing = true;
+      const pos = getCanvasPos(e, dc);
+      drawStart = pos;
+      lassoPoints = [pos];
+      clearSelectionDraw();
+    });
+
+    dc.addEventListener('mousemove', e => {
+      if(!isDrawing || !sourceImage) return;
+      const pos = getCanvasPos(e, dc);
+      const ctx = dc.getContext('2d');
+      ctx.clearRect(0,0,dc.width,dc.height);
+
+      if(activeTool === 'rect'){
+        const x = Math.min(pos.x, drawStart.x);
+        const y = Math.min(pos.y, drawStart.y);
+        const w = Math.abs(pos.x - drawStart.x);
+        const h = Math.abs(pos.y - drawStart.y);
+        ctx.strokeStyle = '#3B6D11';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6,3]);
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = 'rgba(59,109,17,.08)';
+        ctx.fillRect(x, y, w, h);
+      } else {
+        // Lasso
+        lassoPoints.push(pos);
+        ctx.beginPath();
+        ctx.moveTo(lassoPoints[0].x, lassoPoints[0].y);
+        lassoPoints.forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.strokeStyle = '#3B6D11';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6,3]);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(59,109,17,.08)';
+        ctx.fill();
+      }
+    });
+
+    dc.addEventListener('mouseup', e => {
+      if(!isDrawing) return;
+      isDrawing = false;
+      const pos = getCanvasPos(e, dc);
+
+      if(activeTool === 'rect'){
+        // Store bounding box in image coords
+        const scaleX = sourceImage.naturalWidth / dc.width;
+        const scaleY = sourceImage.naturalHeight / dc.height;
+        const x = Math.round(Math.min(pos.x, drawStart.x) * scaleX);
+        const y = Math.round(Math.min(pos.y, drawStart.y) * scaleY);
+        const w = Math.round(Math.abs(pos.x - drawStart.x) * scaleX);
+        const h = Math.round(Math.abs(pos.y - drawStart.y) * scaleY);
+        if(w > 10 && h > 10){
+          selectionData = {type:'rect', x, y, width:w, height:h};
+          showToast('Selection set — click Remove Background', 'info');
+        }
+      } else {
+        // Lasso — store scaled points
+        if(lassoPoints.length > 5){
+          const scaleX = sourceImage.naturalWidth / dc.width;
+          const scaleY = sourceImage.naturalHeight / dc.height;
+          const scaled = lassoPoints.map(p=>({
+            x: Math.round(p.x * scaleX),
+            y: Math.round(p.y * scaleY)
+          }));
+          selectionData = {type:'lasso', points: scaled};
+          showToast('Lasso set — click Remove Background', 'info');
+        }
+      }
+    });
+
+    // Touch support
+    dc.addEventListener('touchstart', e=>{ e.preventDefault(); dc.dispatchEvent(new MouseEvent('mousedown', getTouchPos(e))); }, {passive:false});
+    dc.addEventListener('touchmove',  e=>{ e.preventDefault(); dc.dispatchEvent(new MouseEvent('mousemove', getTouchPos(e))); }, {passive:false});
+    dc.addEventListener('touchend',   e=>{ e.preventDefault(); dc.dispatchEvent(new MouseEvent('mouseup',   getTouchPos(e))); }, {passive:false});
+  }
+
+  function getCanvasPos(e, canvas){
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top)  * scaleY
+    };
+  }
+
+  function getTouchPos(e){
+    const t = e.touches[0] || e.changedTouches[0];
+    return {clientX: t.clientX, clientY: t.clientY};
+  }
+
+  function clearSelectionDraw(){
+    selectionData = null;
+    lassoPoints = [];
+    const dc = document.getElementById('draw-canvas');
+    if(dc) dc.getContext('2d').clearRect(0,0,dc.width,dc.height);
+  }
+
+  function clearSelection(){
+    clearSelectionDraw();
+    showToast('Selection cleared', 'info');
+  }
+
+  // ── Upload ────────────────────────────────────────────────────────────────
+  const dz = document.getElementById('drop-zone');
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+  function handleFile(file){
+    if(!file) return;
+    sourceFile = file;
+    const reader = new FileReader();
+    reader.onload = e => showSource(e.target.result);
+    reader.readAsDataURL(file);
+  }
+
+  function showSource(src){
+    const sc = document.getElementById('source-canvas');
+    const dc = document.getElementById('draw-canvas');
+    const img = new Image();
+    img.onload = () => {
+      sourceImage = img;
+      // Set canvas dimensions to match image aspect
+      sc.width  = img.naturalWidth;
+      sc.height = img.naturalHeight;
+      dc.width  = img.naturalWidth;
+      dc.height = img.naturalHeight;
+      sc.getContext('2d').drawImage(img, 0, 0);
+      clearSelectionDraw();
+    };
+    img.src = src;
+    document.getElementById('source-wrap').style.display = 'block';
+  }
+
+  function clearSource(){
+    sourceFile = null;
+    sourceImage = null;
+    selectionData = null;
+    document.getElementById('source-wrap').style.display = 'none';
+    document.getElementById('result-empty').style.display = 'block';
+    document.getElementById('result-wrap').style.display = 'none';
+    resultImageData = null;
+    document.querySelectorAll('.arch-thumb.selected').forEach(t=>t.classList.remove('selected'));
+  }
+
+  // ── Archive ───────────────────────────────────────────────────────────────
+  async function loadArchive(){
+    const data = await fetch('/api/photos/all?view=all').then(r=>r.json());
+    allArchivePhotos = data.photos || [];
+    renderArchive(allArchivePhotos);
+  }
+
+  let badgeArchOrg = 'all';
+
+  function setBadgeArchOrg(org, btn){
+    badgeArchOrg = org;
+    document.querySelectorAll('#badge-arch-tabs button').forEach(b=>b.style.background='none');
+    btn.style.background='white';
+    filterArchive();
+  }
+
+  function renderArchive(photos){
+    const SE = {spring:'🌸',summer:'☀️',fall:'🍂',winter:'❄️'};
+    const grid = document.getElementById('archive-grid');
+
+    const makeThumb = p => `<img class="arch-thumb" src="/thumbnails/user_${window._userId}/inbox/${p.stored_filename}"
+      data-src="/uploads/user_${window._userId}/inbox/${p.stored_filename}"
+      data-id="${p.id}" onclick="selectArchivePhoto(this)"
+      onerror="this.style.display='none'" loading="lazy"
+      title="${p.label||''}${p.variety?' · '+p.variety:''}">`;
+
+    if(badgeArchOrg === 'label'){
+      const groups = {};
+      photos.forEach(p=>{ const k=p.label||'(unlabeled)'; if(!groups[k]) groups[k]=[]; groups[k].push(p); });
+      grid.style.display = 'block';
+      grid.innerHTML = Object.keys(groups).sort().map(label=>`
+        <div style="margin-bottom:.6rem;">
+          <div style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gray200);padding:.3rem 0 .2rem;">🌱 ${label} (${groups[label].length})</div>
+          <div class="archive-grid" style="display:grid;max-height:none;">${groups[label].map(makeThumb).join('')}</div>
+        </div>`).join('');
+    } else if(badgeArchOrg === 'season'){
+      const ORDER = ['spring','summer','fall','winter','(no season)'];
+      const groups = {spring:[],summer:[],fall:[],winter:[],'(no season)':[]};
+      photos.forEach(p=>{ const k=p.season||'(no season)'; if(!groups[k]) groups[k]=[]; groups[k].push(p); });
+      grid.style.display = 'block';
+      grid.innerHTML = ORDER.filter(s=>groups[s]&&groups[s].length).map(season=>`
+        <div style="margin-bottom:.6rem;">
+          <div style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gray200);padding:.3rem 0 .2rem;">${SE[season]||'📷'} ${season} (${groups[season].length})</div>
+          <div class="archive-grid" style="display:grid;max-height:none;">${groups[season].map(makeThumb).join('')}</div>
+        </div>`).join('');
+    } else {
+      grid.style.display = 'grid';
+      grid.innerHTML = photos.map(makeThumb).join('');
+    }
+  }
+
+  function filterArchive(){
+    const q = document.getElementById('arch-search').value.toLowerCase();
+    const filtered = allArchivePhotos.filter(p=>
+      !q ||
+      (p.label||'').toLowerCase().includes(q) ||
+      (p.variety||'').toLowerCase().includes(q) ||
+      (p.season||'').toLowerCase().includes(q)
+    );
+    renderArchive(filtered);
+  }
+
+  function selectArchivePhoto(el){
+    document.querySelectorAll('.arch-thumb.selected').forEach(t=>t.classList.remove('selected'));
+    el.classList.add('selected');
+    showSource(el.dataset.src);
+    sourceFile = null;
+  }
+
+  // ── Background removal ────────────────────────────────────────────────────
+  async function removeBackground(){
+    const sc = document.getElementById('source-canvas');
+    if(!sourceImage){ showToast('Select a photo first','warn'); return; }
+
+    document.getElementById('spinner-msg').textContent = 'Removing background...';
+    document.getElementById('spinner-overlay').classList.add('show');
+
+    try {
+      let blob;
+
+      if(selectionData){
+        // Crop to selection first, then remove background
+        const offscreen = document.createElement('canvas');
+        const ctx = offscreen.getContext('2d');
+
+        if(selectionData.type === 'rect'){
+          offscreen.width  = selectionData.width;
+          offscreen.height = selectionData.height;
+          ctx.drawImage(sourceImage,
+            selectionData.x, selectionData.y, selectionData.width, selectionData.height,
+            0, 0, selectionData.width, selectionData.height
+          );
+        } else {
+          // Lasso — get bounding box of path, mask outside
+          const pts = selectionData.points;
+          const minX = Math.min(...pts.map(p=>p.x));
+          const minY = Math.min(...pts.map(p=>p.y));
+          const maxX = Math.max(...pts.map(p=>p.x));
+          const maxY = Math.max(...pts.map(p=>p.y));
+          offscreen.width  = maxX - minX;
+          offscreen.height = maxY - minY;
+          // Clip to lasso path then draw image
+          ctx.beginPath();
+          pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x-minX,p.y-minY) : ctx.lineTo(p.x-minX,p.y-minY));
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(sourceImage, -minX, -minY);
+        }
+
+        blob = await new Promise(res => offscreen.toBlob(res, 'image/jpeg', 0.95));
+      } else {
+        // No selection — use full image
+        if(sourceFile){
+          blob = sourceFile;
+        } else {
+          const srcEl = document.getElementById('source-canvas');
+          blob = await new Promise(res => srcEl.toBlob(res, 'image/jpeg', 0.95));
+        }
+      }
+
+      const formData = new FormData();
+      formData.append('file', blob, 'photo.jpg');
+
+      const res = await fetch('/api/badges/remove-background', {
+        method: 'POST',
+        body: formData
+      });
+
+      if(!res.ok){
+        const err = await res.json();
+        throw new Error(err.error || 'Failed');
+      }
+
+      const resultBlob = await res.blob();
+      resultImageData = URL.createObjectURL(resultBlob);
+
+      document.getElementById('result-empty').style.display = 'none';
+      document.getElementById('result-wrap').style.display = 'block';
+      drawBadgeCanvas();
+      showToast('Background removed!');
+    } catch(e){
+      showToast(e.message || 'Background removal failed', 'error');
+    } finally {
+      document.getElementById('spinner-overlay').classList.remove('show');
+    }
+  }
+
+  // ── Canvas rendering ──────────────────────────────────────────────────────
+  function drawBadgeCanvas(){
+    if(!resultImageData) return;
+    const canvas = document.getElementById('badge-canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      if(currentBg !== 'transparent'){
+        ctx.fillStyle = currentBg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      ctx.drawImage(img, 0, 0);
+      const wrap = document.getElementById('badge-canvas-wrap');
+      wrap.style.background = currentBg === 'transparent'
+        ? 'repeating-conic-gradient(#f0f0f0 0% 25%,white 0% 50%) 0 0 / 16px 16px'
+        : currentBg;
+    };
+    img.src = resultImageData;
+  }
+
+  function setBg(bg, el){
+    currentBg = bg;
+    document.querySelectorAll('.bg-opt').forEach(b=>b.classList.remove('active'));
+    if(el) el.classList.add('active');
+    drawBadgeCanvas();
+  }
+
+  // ── Download ──────────────────────────────────────────────────────────────
+  function downloadBadge(format){
+    if(!resultImageData){ showToast('No badge to download','warn'); return; }
+    const canvas = document.getElementById('badge-canvas');
+    const mime = format==='png' ? 'image/png' : 'image/jpeg';
+    canvas.toBlob(blob=>{
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `badge.${format}`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, mime, 0.95);
+  }
+
+  async function saveToBadges(){
+    if(!resultImageData){ showToast('No badge to save','warn'); return; }
+    const canvas = document.getElementById('badge-canvas');
+    canvas.toBlob(async blob=>{
+      const fd = new FormData();
+      fd.append('file', blob, `badge_${Date.now()}.png`);
+      const res = await fetch('/api/badges/save', { method:'POST', body:fd });
+      const data = await res.json();
+      if(data.success) showToast('Badge saved to your badges folder');
+      else showToast('Save failed','error');
+    }, 'image/png');
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showToast(msg,type='success'){
+    const t=document.getElementById('toast');
+    t.textContent=msg;t.className=`show toast-${type}`;
+    clearTimeout(t._timer);t._timer=setTimeout(()=>t.className='',4000);
+  }
+  function doLogout(){ fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/'); }
+
+
+  function toggleDarkMode(){
+    const isDark = document.documentElement.classList.toggle('dark-mode');
+    localStorage.setItem('site-dark-mode', isDark ? 'dark' : 'light');
+    // Update toggle button text on any page
+    const btn = document.getElementById('dark-mode-toggle');
+    if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+  }
+  // Init toggle button state
+  (function(){
+    const btn = document.getElementById('dark-mode-toggle');
+    if(btn) btn.textContent = document.documentElement.classList.contains('dark-mode') ? '☀️' : '🌙';
+  })();
+
+  init();
+</script>
+</body>
+</html>

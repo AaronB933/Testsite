@@ -6,6 +6,14 @@
   <title>Plant Archive — Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+  // Apply dark mode before render to prevent flash
+  (function(){
+    if(localStorage.getItem('site-dark-mode')==='dark'){
+      document.documentElement.classList.add('dark-mode');
+    }
+  })();
+</script>
 </head>
 <body>
 <style>
@@ -172,6 +180,47 @@
   .tab-bar{display:flex;gap:.25rem;background:var(--gray50);border-radius:10px;padding:3px;margin-bottom:1rem;}
   .tab-btn{flex:1;padding:.4rem;text-align:center;border-radius:7px;font-size:.82rem;font-weight:500;cursor:pointer;color:var(--gray600);border:none;background:none;font-family:inherit;transition:background .15s;}
   .tab-btn.active{background:white;color:var(--gray800);}
+
+  /* Site-wide dark mode */
+  html.dark-mode body:not(.garden-page){
+    background:#1a1a1a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode nav { background:#0f2206 !important; }
+  html.dark-mode .sidebar, html.dark-mode .main,
+  html.dark-mode .panel, html.dark-mode aside {
+    background:#2a2a2a !important;
+    border-color:#3a3a3a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode .photo-card, html.dark-mode .modal,
+  html.dark-mode .confirm-box, html.dark-mode #label-popup,
+  html.dark-mode #variety-popup {
+    background:#2a2a2a !important;
+    border-color:#3a3a3a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode input, html.dark-mode select, html.dark-mode textarea {
+    background:#1a1a1a !important;
+    border-color:#3a3a3a !important;
+    color:#ddd !important;
+  }
+  html.dark-mode .sb-item:hover, html.dark-mode .tree-row:hover,
+  html.dark-mode .sub-row:hover, html.dark-mode .variety-row:hover {
+    background:#333 !important;
+  }
+  html.dark-mode .sb-item.active, html.dark-mode .sub-row.active,
+  html.dark-mode .variety-row.active {
+    background:rgba(59,109,17,.3) !important;
+  }
+  html.dark-mode .org-box.season-box { background:linear-gradient(135deg,#0f2206,#173404) !important; }
+  html.dark-mode .org-box.plant-box { background:linear-gradient(135deg,#1a3510,#2a5a1a) !important; }
+  html.dark-mode .btn-ghost { background:#333 !important; color:#ccc !important; border-color:#444 !important; }
+  html.dark-mode .sel-bar { background:#2a2a2a !important; border-color:#3a3a3a !important; }
+  html.dark-mode .photo-card .p-date { color:#97C459 !important; }
+  html.dark-mode .photo-card .p-label { color:#888 !important; }
+  html.dark-mode .toolbar-count { color:#888 !important; }
+
 </style>
 
 <nav>
@@ -181,6 +230,8 @@
     <a href="/upload">Upload</a>
     <a href="/organize">Organize</a>
     <a href="/tracker" class="active">Plant Tracker</a>
+    <a href="/badges">Badge Creation</a>
+    <a href="/garden">Garden Planner</a>
   </div>
   <div class="user-area">
     <span class="username" id="nav-username"></span>
@@ -373,8 +424,14 @@
     </div>
 
     <div id="photo-tab-archive" style="display:none;">
-      <p style="font-size:.8rem;color:var(--gray200);margin-bottom:.5rem;">Click a photo from your archive to link it:</p>
-      <div class="archive-picker" id="archive-picker"></div>
+      <div style="display:flex;gap:.25rem;background:var(--gray50);border-radius:8px;padding:2px;margin-bottom:.5rem;">
+        <button onclick="renderTrackerArchive('all',document.getElementById('tracker-arch-search').value);this.parentElement.querySelectorAll('button').forEach(b=>b.style.background='');this.style.background='white';" style="flex:1;padding:.3rem;border-radius:6px;font-size:.72rem;font-family:inherit;cursor:pointer;border:none;background:white;">All</button>
+        <button onclick="renderTrackerArchive('label',document.getElementById('tracker-arch-search').value);this.parentElement.querySelectorAll('button').forEach(b=>b.style.background='');this.style.background='white';" style="flex:1;padding:.3rem;border-radius:6px;font-size:.72rem;font-family:inherit;cursor:pointer;border:none;background:none;">🌱 By Plant</button>
+        <button onclick="renderTrackerArchive('season',document.getElementById('tracker-arch-search').value);this.parentElement.querySelectorAll('button').forEach(b=>b.style.background='');this.style.background='white';" style="flex:1;padding:.3rem;border-radius:6px;font-size:.72rem;font-family:inherit;cursor:pointer;border:none;background:none;">🍂 By Season</button>
+      </div>
+      <input id="tracker-arch-search" type="text" placeholder="Search..." oninput="renderTrackerArchive('all',this.value)"
+        style="width:100%;padding:.35rem .6rem;border:1px solid var(--gray100);border-radius:7px;font-family:inherit;font-size:.82rem;margin-bottom:.4rem;outline:none;"/>
+      <div class="archive-picker" id="archive-picker" style="max-height:220px;overflow-y:auto;"></div>
     </div>
 
     <div class="form-row" style="margin-top:.75rem;">
@@ -818,15 +875,60 @@
     document.getElementById('photo-file-input').value = '';
     switchPhotoTab('upload', document.querySelector('.tab-btn'));
 
-    // Load archive photos for picker
-    const archivePhotos = await fetch('/api/photos').then(r => r.json());
-    document.getElementById('archive-picker').innerHTML = archivePhotos.slice(0, 60).map(p => `
-      <img class="ap-thumb" src="/uploads/user_${window._userId}/inbox/${p.stored_filename}"
-           data-id="${p.id}" loading="lazy"
-           onclick="selectArchivePhoto(${p.id}, this)"
-           onerror="this.style.display='none'">`).join('');
-
+    // Load archive photos for picker - use /api/photos/all for full list
+    const archData = await fetch('/api/photos/all?view=all').then(r => r.json());
+    const archivePhotos = archData.photos || [];
+    window._trackerArchivePhotos = archivePhotos;
+    renderTrackerArchive('all', '');
     document.getElementById('photo-modal').classList.add('show');
+  }
+
+  function renderTrackerArchive(org, q){
+    const photos = (window._trackerArchivePhotos||[]).filter(p =>
+      !q || (p.label||'').toLowerCase().includes(q) ||
+      (p.variety||'').toLowerCase().includes(q) ||
+      (p.season||'').toLowerCase().includes(q)
+    );
+    const SE = {spring:'🌸',summer:'☀️',fall:'🍂',winter:'❄️'};
+    const grid = document.getElementById('archive-picker');
+
+    if(org === 'label'){
+      const groups = {};
+      photos.forEach(p => { const k = p.label||'(unlabeled)'; if(!groups[k]) groups[k]=[]; groups[k].push(p); });
+      grid.style.display = 'block';
+      grid.innerHTML = Object.keys(groups).sort().map(label => `
+        <div style="margin-bottom:.6rem;">
+          <div style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gray200);padding:.3rem 0 .2rem;">🌱 ${label}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(65px,1fr));gap:.3rem;">
+            ${groups[label].map(p => trackerThumb(p)).join('')}
+          </div>
+        </div>`).join('');
+    } else if(org === 'season'){
+      const ORDER = ['spring','summer','fall','winter','(no season)'];
+      const groups = {spring:[],summer:[],fall:[],winter:[],'(no season)':[]};
+      photos.forEach(p => { const k=p.season||'(no season)'; if(!groups[k]) groups[k]=[]; groups[k].push(p); });
+      grid.style.display = 'block';
+      grid.innerHTML = ORDER.filter(s=>groups[s]&&groups[s].length).map(season => `
+        <div style="margin-bottom:.6rem;">
+          <div style="font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--gray200);padding:.3rem 0 .2rem;">${SE[season]||'📷'} ${season}</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(65px,1fr));gap:.3rem;">
+            ${groups[season].map(p => trackerThumb(p)).join('')}
+          </div>
+        </div>`).join('');
+    } else {
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(65px,1fr))';
+      grid.innerHTML = photos.map(p => trackerThumb(p)).join('');
+    }
+  }
+
+  function trackerThumb(p){
+    return `<img src="/thumbnails/user_${window._userId}/inbox/${p.stored_filename}"
+      style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;cursor:pointer;border:2px solid transparent;"
+      onclick="selectArchivePhoto(${p.id},this)"
+      onerror="this.style.display='none'"
+      loading="lazy"
+      title="${p.label||''}${p.variety?' · '+p.variety:''}">`;
   }
   function closePhotoModal() { document.getElementById('photo-modal').classList.remove('show'); }
 
@@ -940,6 +1042,20 @@
     clearTimeout(t._timer); t._timer = setTimeout(() => t.className = '', 3500);
   }
   function doLogout() { fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/'); }
+
+
+  function toggleDarkMode(){
+    const isDark = document.documentElement.classList.toggle('dark-mode');
+    localStorage.setItem('site-dark-mode', isDark ? 'dark' : 'light');
+    // Update toggle button text on any page
+    const btn = document.getElementById('dark-mode-toggle');
+    if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+  }
+  // Init toggle button state
+  (function(){
+    const btn = document.getElementById('dark-mode-toggle');
+    if(btn) btn.textContent = document.documentElement.classList.contains('dark-mode') ? '☀️' : '🌙';
+  })();
 
   init();
 </script>

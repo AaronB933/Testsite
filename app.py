@@ -17,6 +17,9 @@ from routes.photos import bp as photos_bp
 from routes.trash import bp as trash_bp
 from routes.organize import bp as organize_bp
 from routes.tracker import bp as tracker_bp
+from routes.editor import bp as editor_bp
+from routes.badges import bp as badges_bp
+from routes.garden import bp as garden_bp
 
 
 def create_app():
@@ -30,6 +33,9 @@ def create_app():
     app.register_blueprint(trash_bp)
     app.register_blueprint(organize_bp)
     app.register_blueprint(tracker_bp)
+    app.register_blueprint(editor_bp)
+    app.register_blueprint(badges_bp)
+    app.register_blueprint(garden_bp)
 
     return app
 

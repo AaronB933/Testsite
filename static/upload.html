@@ -6,6 +6,14 @@
   <title>Plant Archive — Upload</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+  // Apply dark mode before render to prevent flash
+  (function(){
+    if(localStorage.getItem('site-dark-mode')==='dark'){
+      document.documentElement.classList.add('dark-mode');
+    }
+  })();
+</script>
 </head>
 <body>
 <style>
@@ -85,15 +93,58 @@
   .empty-state { text-align:center; padding:3.5rem 2rem; color:var(--gray-200); }
   .empty-state .icon { font-size:2.5rem; margin-bottom:0.75rem; }
   .empty-state p { font-size:0.875rem; }
+
+  /* Site-wide dark mode */
+  html.dark-mode body:not(.garden-page){
+    background:#1a1a1a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode nav { background:#0f2206 !important; }
+  html.dark-mode .sidebar, html.dark-mode .main,
+  html.dark-mode .panel, html.dark-mode aside {
+    background:#2a2a2a !important;
+    border-color:#3a3a3a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode .photo-card, html.dark-mode .modal,
+  html.dark-mode .confirm-box, html.dark-mode #label-popup,
+  html.dark-mode #variety-popup {
+    background:#2a2a2a !important;
+    border-color:#3a3a3a !important;
+    color:#ccc !important;
+  }
+  html.dark-mode input, html.dark-mode select, html.dark-mode textarea {
+    background:#1a1a1a !important;
+    border-color:#3a3a3a !important;
+    color:#ddd !important;
+  }
+  html.dark-mode .sb-item:hover, html.dark-mode .tree-row:hover,
+  html.dark-mode .sub-row:hover, html.dark-mode .variety-row:hover {
+    background:#333 !important;
+  }
+  html.dark-mode .sb-item.active, html.dark-mode .sub-row.active,
+  html.dark-mode .variety-row.active {
+    background:rgba(59,109,17,.3) !important;
+  }
+  html.dark-mode .org-box.season-box { background:linear-gradient(135deg,#0f2206,#173404) !important; }
+  html.dark-mode .org-box.plant-box { background:linear-gradient(135deg,#1a3510,#2a5a1a) !important; }
+  html.dark-mode .btn-ghost { background:#333 !important; color:#ccc !important; border-color:#444 !important; }
+  html.dark-mode .sel-bar { background:#2a2a2a !important; border-color:#3a3a3a !important; }
+  html.dark-mode .photo-card .p-date { color:#97C459 !important; }
+  html.dark-mode .photo-card .p-label { color:#888 !important; }
+  html.dark-mode .toolbar-count { color:#888 !important; }
+
 </style>
 
 <nav>
   <span class="brand">🌿 Plant Archive</span>
   <div class="nav-links">
     <a href="/">Home</a>
-    <a href="/upload" class="active">Upload Photos</a>
-    <a href="/organize">Organize Photos</a>
+    <a href="/upload" class="active">Upload</a>
+    <a href="/organize">Organize</a>
     <a href="/tracker">Plant Tracker</a>
+    <a href="/badges">Badge Creation</a>
+    <a href="/garden">Garden Planner</a>
   </div>
   <div class="user-area">
     <span class="username" id="nav-username"></span>
@@ -281,7 +332,11 @@
   function ext(name) { return name.slice(name.lastIndexOf('.')).toLowerCase(); }
   function fmtDate(d) {
     if (!d) return 'Unknown date';
-    return new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    // Handle both "2026-04-25" and "2026-04-25T00:00:00" formats from PostgreSQL
+    const clean = d.includes('T') ? d : d + 'T00:00:00';
+    const dt = new Date(clean);
+    if(isNaN(dt)) return 'Unknown date';
+    return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
   }
   function showToast(msg, type='success') {
     const t = document.getElementById('toast');
@@ -289,6 +344,20 @@
     clearTimeout(t._timer); t._timer = setTimeout(() => t.className='', 3500);
   }
   function doLogout() { fetch('/api/logout',{method:'POST'}).then(()=>window.location.href='/'); }
+
+
+  function toggleDarkMode(){
+    const isDark = document.documentElement.classList.toggle('dark-mode');
+    localStorage.setItem('site-dark-mode', isDark ? 'dark' : 'light');
+    // Update toggle button text on any page
+    const btn = document.getElementById('dark-mode-toggle');
+    if(btn) btn.textContent = isDark ? '☀️' : '🌙';
+  }
+  // Init toggle button state
+  (function(){
+    const btn = document.getElementById('dark-mode-toggle');
+    if(btn) btn.textContent = document.documentElement.classList.contains('dark-mode') ? '☀️' : '🌙';
+  })();
 
   init();
 </script>
