@@ -87,7 +87,8 @@ def delete_permanent():
     user = current_user()
     trash_dir = os.path.join(user_dir(user["id"]), "trash")
     paths = permanently_delete_photos(photo_ids, user["id"])
-    for stored_filename, file_path, season_path, plant_path in paths:
+    for file_path, season_path, plant_path in paths:
+        stored_filename = os.path.basename(file_path)
         trash_path = os.path.join(trash_dir, stored_filename)
         for p in [trash_path, file_path, season_path, plant_path]:
             if p and os.path.exists(p):

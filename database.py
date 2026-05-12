@@ -185,17 +185,27 @@ def verify_user(username: str, password: str):
 # ── Photos ────────────────────────────────────────────────────────────────────
 
 def insert_photo(user_id, original_filename, stored_filename,
-                 file_path, date_taken, exif_found) -> int:
+                 file_path, date_taken, exif_found, file_hash=None) -> int:
+    # Ensure file_hash column exists
+    try:
+        from db import engine
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE photos ADD COLUMN IF NOT EXISTS file_hash TEXT"))
+            conn.commit()
+    except Exception:
+        pass
     return execute_write_returning("""
         INSERT INTO photos
-        (user_id, original_filename, stored_filename, file_path, date_taken, exif_found)
-        VALUES (:uid, :orig, :stored, :path, :dt, :exif)
+        (user_id, original_filename, stored_filename, file_path, date_taken, exif_found, file_hash)
+        VALUES (:uid, :orig, :stored, :path, :dt, :exif, :hash)
         RETURNING id
     """, {
         "uid": user_id, "orig": original_filename, "stored": stored_filename,
         "path": file_path,
         "dt": str(date_taken) if date_taken else None,
-        "exif": exif_found
+        "exif": exif_found,
+        "hash": file_hash
     })
 
 
@@ -412,10 +422,10 @@ def permanently_delete_photos(photo_ids, user_id):
     placeholders, params = _build_in_clause(photo_ids)
     params['uid'] = user_id
     rows = execute(f"""
-        SELECT stored_filename, file_path, season_copy_path, plant_copy_path FROM photos
+        SELECT file_path, season_copy_path, plant_copy_path FROM photos
         WHERE id IN ({placeholders}) AND user_id = :uid
     """, params)
-    paths = [(r["stored_filename"], r["file_path"], r["season_copy_path"], r["plant_copy_path"])
+    paths = [(r["file_path"], r["season_copy_path"], r["plant_copy_path"])
              for r in rows]
     with engine.connect() as conn:
         conn.execute(text(f"DELETE FROM upload_log WHERE photo_id IN ({placeholders})"), params)

@@ -8,7 +8,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/base.css">
   <link rel="stylesheet" href="/static/css/organize.css">
-  <script src="/static/js/shared.js"></script>
 </head>
 <body>
 
@@ -250,17 +249,27 @@
   html.dark-mode .photo-card .p-label { color:#888 !important; }
   html.dark-mode .toolbar-count { color:#888 !important; }
 
+  /* Compact zoom — hide card text when very small */
+  #grid-wrap.zoom-compact .photo-card .info { display: none !important; }
+  #grid-wrap.zoom-compact .photo-card { border-radius: 3px; }
+
+  #sidebar-ctx-menu.show { display: block !important; }
+  #sidebar-ctx-menu .ctx-item { padding:.45rem .85rem;font-size:.8rem;color:var(--gray800);cursor:pointer;display:flex;align-items:center;gap:.5rem; }
+  #sidebar-ctx-menu .ctx-item:hover { background:var(--gray50); }
+  #sidebar-ctx-menu .ctx-item.danger { color:#dc2626; }
+  #sidebar-ctx-menu .ctx-sep { height:1px;background:var(--gray100);margin:.3rem 0; }
 </style>
 
 <div class="layout">
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="sb-section">Labels</div>
+    <div class="sb-section" oncontextmenu="showSidebarCtx(event,'labels-section',{})">Labels</div>
     <div class="sb-item active" id="sb-all" onclick="loadView('all',this)">All photos <span class="sb-count" id="sb-all-count">0</span></div>
     <div class="sb-item" id="sb-inbox" onclick="loadView('inbox',this)">📥 Inbox <span class="sb-count" id="sb-inbox-count">0</span></div>
+    <div class="sb-item" id="sb-undated" onclick="loadView('undated',this)">📅 Undated <span class="sb-count" id="sb-undated-count">0</span></div>
     <div id="label-list"></div>
 
-    <div class="sb-section" style="margin-top:.5rem;">By Plant</div>
+    <div class="sb-section" style="margin-top:.5rem;" oncontextmenu="showSidebarCtx(event,'plant-section',{})">By Plant</div>
     <div id="plant-tree"></div>
 
     <div class="org-box plant-box">
@@ -288,14 +297,11 @@
       <div class="toolbar-left">
         <div class="toolbar-title" id="view-title">All photos</div>
         <div class="toolbar-count" id="view-count"></div>
+        <button class="btn btn-ghost" style="font-size:.78rem;padding:.3rem .75rem;" onclick="selectAll()">Select all</button>
+        <button class="btn btn-ghost" style="font-size:.78rem;padding:.3rem .75rem;" onclick="clearSelection()">Clear</button>
       </div>
       <div class="toolbar-right" id="toolbar-right"></div>
-      <div class="zoom-bar">
-        <button class="zoom-btn" data-size="120" onclick="setZoom(120)" title="Small">S</button>
-        <button class="zoom-btn active" data-size="160" onclick="setZoom(160)" title="Medium">M</button>
-        <button class="zoom-btn" data-size="200" onclick="setZoom(200)" title="Large">L</button>
-        <button class="zoom-btn" data-size="240" onclick="setZoom(240)" title="Extra Large">XL</button>
-      </div>
+      <span style="font-size:.72rem;color:var(--gray200);" title="Ctrl+scroll to zoom">🔍 Ctrl+scroll to zoom</span>
     </div>
 
     <div class="sel-bar" id="sel-bar">
@@ -314,6 +320,8 @@
 
 <!-- Context menu -->
 <div id="ctx-menu"></div>
+<div id="sidebar-ctx-menu" style="display:none;position:fixed;background:white;border:1px solid var(--gray100);border-radius:10px;padding:.3rem 0;z-index:9000;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,.12);" class="ctx-menu-base"></div>
+<div id="zoom-indicator" style="position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:white;padding:.35rem .85rem;border-radius:20px;font-size:.78rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:500;"></div>
 
 <!-- Label popup -->
 <div id="label-popup">
@@ -442,7 +450,21 @@
 <div id="toast"></div>
 <div id="spinner-overlay"><div class="spinner-box"><div class="spinner"></div><span id="spinner-msg">Working...</span></div></div>
 
-<script src="/static/js/organize.js"></script>
+<script>
+  document.addEventListener('click', e => {
+    const m = document.getElementById('sidebar-ctx-menu');
+    if (m && !m.contains(e.target)) m.classList.remove('show');
+  });
+</script>
+<script src="/static/js/shared.js"></script>
+<script src="/static/js/organize/state.js"></script>
+<script src="/static/js/organize/init.js"></script>
+<script src="/static/js/organize/sidebar.js"></script>
+<script src="/static/js/organize/view.js"></script>
+<script src="/static/js/organize/scroll.js"></script>
+<script src="/static/js/organize/actions.js"></script>
+<script src="/static/js/organize/lightbox.js"></script>
+<script src="/static/js/organize/editor.js"></script>
 <script>initDarkModeToggle(); init();</script>
 </body>
 </html>

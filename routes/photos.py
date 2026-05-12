@@ -4,6 +4,7 @@ photos.py — Photo upload, fetching, labeling, and serving.
 import os
 import shutil
 import hashlib
+import threading
 from datetime import datetime
 from flask import Blueprint, request, jsonify, send_from_directory
 
@@ -20,6 +21,49 @@ from helpers import (current_user, login_required, user_dir,
                      UPLOAD_BASE, VIDEO_EXTENSIONS)
 
 bp = Blueprint("photos", __name__)
+
+# In-memory cache of existing filenames per user
+_filename_cache = {}
+_filename_cache_lock = threading.Lock()
+
+# In-memory cache of existing file hashes per user — avoids DB query per upload
+_hash_cache = {}
+_hash_cache_lock = threading.Lock()
+
+def get_cached_filenames(inbox_dir, user_id):
+    with _filename_cache_lock:
+        if user_id not in _filename_cache:
+            _filename_cache[user_id] = set(
+                os.listdir(inbox_dir) if os.path.exists(inbox_dir) else []
+            )
+        return _filename_cache[user_id]
+
+def add_to_filename_cache(user_id, filename):
+    with _filename_cache_lock:
+        if user_id in _filename_cache:
+            _filename_cache[user_id].add(filename)
+
+
+
+def _load_hash_cache(user_id):
+    """Load hash cache from DB (must be called with lock held)."""
+    if user_id not in _hash_cache:
+        from database import execute
+        rows = execute(
+            "SELECT file_hash FROM photos WHERE user_id = :uid AND file_hash IS NOT NULL",
+            {"uid": user_id}
+        )
+        _hash_cache[user_id] = {r["file_hash"] for r in rows}
+    return _hash_cache[user_id]
+
+def check_and_add_hash(user_id, file_hash):
+    """Atomically check if hash exists and add it. Returns True if duplicate."""
+    with _hash_cache_lock:
+        cache = _load_hash_cache(user_id)
+        if file_hash in cache:
+            return True
+        cache.add(file_hash)
+        return False
 
 
 # ── Stats ──────────────────────────────────────────────────────────────────────
@@ -66,15 +110,11 @@ def upload_photo():
     with open(temp_path, 'rb') as f:
         file_hash = hashlib.md5(f.read()).hexdigest()
 
-    existing_hash = execute(
-        "SELECT id, stored_filename FROM photos WHERE user_id = :uid AND file_hash = :hash",
-        {"uid": user["id"], "hash": file_hash}
-    )
-    if existing_hash:
+    if check_and_add_hash(user["id"], file_hash):
         os.remove(temp_path)
         return jsonify({
             "error": "duplicate",
-            "message": f"Already uploaded as {existing_hash[0]['stored_filename']}"
+            "message": "Already uploaded"
         }), 409
 
     date_taken, exif_found = read_date_taken(temp_path)
@@ -86,10 +126,11 @@ def upload_photo():
         except ValueError:
             pass
 
+    undated = False
     if date_taken is None:
-        os.remove(temp_path)
-        return jsonify({"error": "no_date",
-                        "message": "No EXIF date found. Please set the date manually."}), 422
+        date_taken = datetime(1900, 1, 1)
+        exif_found = False
+        undated = True
 
     # Convert HEIC to JPEG
     if ext.lower() in {'.heic', '.heif'}:
@@ -99,7 +140,7 @@ def upload_photo():
             register_heif_opener()
             img = Image.open(temp_path)
             stored_filename_base = build_stored_filename(date_taken, "photo", ".jpg",
-                                                          get_existing_filenames(inbox_dir))
+                                                          get_cached_filenames(inbox_dir, user["id"]))
             final_path = os.path.join(inbox_dir, stored_filename_base)
             img.save(final_path, 'JPEG', quality=95)
             os.remove(temp_path)
@@ -107,32 +148,16 @@ def upload_photo():
         except Exception as e:
             print(f"HEIC conversion failed: {e}")
             stored_filename = build_stored_filename(date_taken, "photo", ext,
-                                                     get_existing_filenames(inbox_dir))
+                                                     get_cached_filenames(inbox_dir, user["id"]))
             final_path = os.path.join(inbox_dir, stored_filename)
             shutil.move(temp_path, final_path)
     else:
         stored_filename = build_stored_filename(date_taken, "photo", ext,
-                                                 get_existing_filenames(inbox_dir))
+                                                 get_cached_filenames(inbox_dir, user["id"]))
         final_path = os.path.join(inbox_dir, stored_filename)
         shutil.move(temp_path, final_path)
 
     write_date_to_exif(final_path, date_taken)
-
-    # Generate thumbnail for fast grid loading
-    try:
-        from PIL import Image as PILImage
-        thumb_dir = os.path.join(
-            os.path.dirname(UPLOAD_BASE), 'thumbnails',
-            f"user_{user['id']}", 'inbox'
-        )
-        os.makedirs(thumb_dir, exist_ok=True)
-        thumb_path = os.path.join(thumb_dir, stored_filename)
-        if not os.path.exists(thumb_path):
-            img = PILImage.open(final_path)
-            img.thumbnail((400, 400), PILImage.LANCZOS)
-            img.save(thumb_path, 'JPEG', quality=85, optimize=True)
-    except Exception as e:
-        print(f"Thumbnail generation failed: {e}")
 
     dt = date_taken.date() if hasattr(date_taken, 'date') else date_taken
     photo_id = insert_photo(
@@ -146,11 +171,47 @@ def upload_photo():
     )
     log_action(photo_id, "uploaded", original_filename)
 
+    # Auto-label undated photos and copy to undated folder
+    if undated:
+        from database import set_labels
+        set_labels([photo_id], "No date found", user["id"])
+        # Also copy to undated folder for easy access
+        try:
+            undated_dir = os.path.join(user_dir(user["id"]), "undated")
+            os.makedirs(undated_dir, exist_ok=True)
+            undated_dest = os.path.join(undated_dir, stored_filename)
+            if not os.path.exists(undated_dest):
+                shutil.copy2(final_path, undated_dest)
+        except Exception as e:
+            print(f"Could not copy to undated folder: {e}")
+
+    # Hash already added atomically in check_and_add_hash
+    add_to_filename_cache(user["id"], stored_filename)
+
+    # Generate thumbnail in background — fast uploads, thumbnail ready shortly after
+    def _make_thumb():
+        try:
+            from PIL import Image as PILImage
+            thumb_dir = os.path.join(
+                os.path.dirname(UPLOAD_BASE), 'thumbnails',
+                f"user_{user['id']}", 'inbox'
+            )
+            os.makedirs(thumb_dir, exist_ok=True)
+            thumb_path = os.path.join(thumb_dir, stored_filename)
+            if not os.path.exists(thumb_path):
+                img = PILImage.open(final_path)
+                img.thumbnail((400, 400), PILImage.LANCZOS)
+                img.save(thumb_path, 'JPEG', quality=85, optimize=True)
+        except Exception as e:
+            print(f"Thumbnail generation failed: {e}")
+    threading.Thread(target=_make_thumb, daemon=True).start()
+
     return jsonify({
         "success": True,
         "photo_id": photo_id,
         "stored_filename": stored_filename,
-        "date_taken": date_taken.strftime("%m-%d-%Y") if hasattr(date_taken, 'strftime') else str(date_taken),
+        "date_taken": None if undated else (date_taken.strftime("%m-%d-%Y") if hasattr(date_taken, 'strftime') else str(date_taken)),
+        "undated": undated,
     })
 
 
@@ -310,14 +371,28 @@ def serve_upload(filename):
 
 @bp.route("/thumbnails/<path:filename>")
 def serve_thumbnail(filename):
-    """Serve pre-generated thumbnails for the photo grid."""
+    """Serve pre-generated thumbnails. Strong caching so browser never re-fetches."""
     if not current_user():
         return jsonify({"error": "Not logged in"}), 401
     from flask import make_response
     thumb_base = os.path.join(os.path.dirname(UPLOAD_BASE), 'thumbnails')
-    if not os.path.exists(os.path.join(thumb_base, filename)):
-        # Fall back to full image if thumbnail doesn't exist
-        return serve_upload(filename)
+    thumb_path = os.path.join(thumb_base, filename)
+    if not os.path.exists(thumb_path):
+        # Thumbnail not ready yet — generate it on the fly and cache it
+        try:
+            from PIL import Image as PILImage
+            src_path = os.path.join(UPLOAD_BASE, filename)
+            if os.path.exists(src_path):
+                os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
+                img = PILImage.open(src_path)
+                img.thumbnail((400, 400), PILImage.LANCZOS)
+                img.save(thumb_path, 'JPEG', quality=85, optimize=True)
+            else:
+                return serve_upload(filename)
+        except Exception:
+            return serve_upload(filename)
     response = make_response(send_from_directory(thumb_base, filename))
-    response.headers['Cache-Control'] = 'private, max-age=604800'
+    # Strong cache — browser keeps thumbnail for 30 days, never re-requests
+    response.headers['Cache-Control'] = 'private, max-age=2592000, immutable'
+    response.headers['Vary'] = 'Cookie'
     return response

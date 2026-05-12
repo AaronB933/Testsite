@@ -27,7 +27,14 @@ def organize_seasons():
         if not photo["date_taken"]:
             skipped += 1
             continue
-        d = date.fromisoformat(str(photo["date_taken"]))
+        try:
+            dt_str = str(photo["date_taken"])
+            # Handle both "2026-04-25" and "2026-04-25 00:00:00" formats
+            d = date.fromisoformat(dt_str[:10])
+        except Exception as e:
+            print(f"Date parse error for photo {photo['id']}: {photo['date_taken']} — {e}")
+            skipped += 1
+            continue
         season = get_season(d)
         year = d.year
         season_dir = os.path.join(user_dir(user["id"]), str(year), season)
@@ -100,4 +107,64 @@ def open_folder(folder_type):
         return jsonify({"error": "Unknown folder"}), 400
     os.makedirs(path, exist_ok=True)
     os.startfile(path)
+    return jsonify({"success": True})
+
+
+@bp.route("/api/organize/create-folder", methods=["POST"])
+@login_required
+def create_folder():
+    from flask import request
+    user = current_user()
+    data = request.json
+    folder_type = data.get("type")
+    base = user_dir(user["id"])
+
+    if folder_type == "label":
+        path = os.path.join(base, safe_folder_name(data["name"]))
+    elif folder_type == "year":
+        path = os.path.join(base, str(int(data["year"])))
+    elif folder_type == "plant":
+        path = os.path.join(base, "plants", safe_folder_name(data["name"]))
+    else:
+        return jsonify({"success": False, "error": "unknown type"}), 400
+
+    os.makedirs(path, exist_ok=True)
+    return jsonify({"success": True, "path": path})
+
+
+@bp.route("/api/organize/delete-folder", methods=["POST"])
+@login_required
+def delete_folder():
+    """Delete an organized folder (not the original photos in inbox)."""
+    import shutil as _shutil
+    from flask import request
+    user = current_user()
+    data = request.json
+    folder_type = data.get("type")
+    base = user_dir(user["id"])
+
+    if folder_type == "label":
+        path = os.path.join(base, safe_folder_name(data["name"]))
+    elif folder_type == "year":
+        path = os.path.join(base, str(int(data["year"])))
+    elif folder_type == "season":
+        path = os.path.join(base, str(int(data["year"])), data["season"])
+    elif folder_type == "plant":
+        path = os.path.join(base, "plants", safe_folder_name(data["name"]))
+    else:
+        return jsonify({"success": False, "error": "unknown type"}), 400
+
+    # Safety check — must be within user dir
+    if not path.startswith(base):
+        return jsonify({"success": False, "error": "invalid path"}), 403
+
+    # Don't delete inbox, trash, undated, badges, originals
+    protected = {"inbox", "trash", "undated", "badges", "originals"}
+    folder_name = os.path.basename(path)
+    if folder_name in protected:
+        return jsonify({"success": False, "error": "cannot delete protected folder"}), 403
+
+    if os.path.exists(path):
+        _shutil.rmtree(path)
+
     return jsonify({"success": True})
